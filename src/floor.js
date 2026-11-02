@@ -6,7 +6,7 @@
 
 const wmHex = (h, a = 1)=> new Color().setHex(h).setAlpha(a);
 const WM_ZONE_COLORS = Object.fromEntries(ZONE_KEYS.map(z => [z, wmHex(ZONE_DEFS[z].hex)]));
-const WM_PKG_COLORS = Object.fromEntries(Object.keys(PACKAGE_TYPES).map(k => [k, wmHex(PACKAGE_TYPES[k].color)]));
+const WM_PKG_COLORS = Object.fromEntries(Object.keys(PACKAGE_TYPES).map(k => [k, PACKAGE_TYPES[k].color]));
 const WM_SKIN = ['#f1c27d','#e0ac69','#c68642','#8d5524','#ffdbac','#a0662f'].map(h => wmHex(h));
 const WM_FLOOR = wmHex('#1b2230');
 const WM_PANEL = wmHex('#0f141d');
@@ -72,7 +72,7 @@ class WmBubble
         const p = this.t / this.life;
         const pop = p < .15 ? .6 + p / .15 * .5 : p < .25 ? 1.1 - (p - .15) : 1;
         const a = p > .7 ? 1 - (p - .7) / .3 : 1;
-        wmText(this.text, this.pos, this.size * pop, this.color.withAlpha(a), .12 * this.size, new Color(0,0,0,a*.85));
+        wmText(this.text, this.pos, this.size * pop, this.color.withAlpha(a), .2 * this.size, new Color(.17, .18, .26, a));
     }
 }
 
@@ -84,11 +84,11 @@ class WmFlyer
         this.from = from.copy(); this.to = to.copy(); this.color = color; this.dur = dur; this.arc = arc; this.t = 0;
     }
     update(dt) { this.t += dt; return this.t < this.dur; }
-    draw()
+    draw(ctx)
     {
         const p = smoothStep(this.t / this.dur);
         const pos = this.from.lerp(this.to, p).add(vec2(0, Math.sin(p * Math.PI) * this.arc));
-        drawRect(pos, vec2(.42), this.color, p * 2);
+        NX.box(ctx, pos.x, pos.y, .42, this.color, 0, p * 2);
     }
 }
 
@@ -131,6 +131,10 @@ const shiftView =
         this.selected = null;
         this.vignette = 0;
         this.zoneGlow = {};
+        this.bodies = [];
+        this.drops = [];
+        this.drama = null;
+        this.iconQueue = [];
         for (const k in this.sparks) this.sparks[k]?.destroy();
         this.sparks = {};
         clearParticles();
@@ -310,7 +314,7 @@ const shiftView =
             case 'avoided':
             {
                 const p = d.w ? this.workerPos(d.w) : R[d.inc.zone].pos;
-                this.bubble('Near Miss Avoided', p.add(vec2(0, 1.6)), '#4ade80', .5, 1.6);
+                this.bubble(d.inc.type === 'falling' ? 'Stack secured!' : d.inc.type === 'strike' ? 'EMERGENCY STOP!' : 'Near Miss Avoided', p.add(vec2(0, 1.6)), '#4ade80', .5, 1.6);
                 this.bubble('Safety Risk -8', p.add(vec2(0, 1)), '#86efac', .38, 1.4);
                 wmBurst('heal', p.add(vec2(0, .6)), { scale:.8 });
                 playSfx('saved', .9);
@@ -319,6 +323,7 @@ const shiftView =
             case 'nearMiss':
             {
                 const p = this.workerPos(d.w);
+                if (d.inc.type === 'falling') this.drops.push({ kind:'box', from:p.add(vec2(.9, 4)), to:p.add(vec2(1, -.1)), t:0, dur:.45, spin:1, hit:false, onLand:()=> { particleEffect('dust', p.add(vec2(1, 0)), { scale:.8 }); playSfx('crash', .5, 1.4); addScreenShake(.12, .2); } });
                 this.bubble('Near miss… lucky', p.add(vec2(0, 1.5)), '#fde68a', .45, 1.5);
                 playSfx('glass', .4, .8);
                 break;
@@ -327,6 +332,7 @@ const shiftView =
             {
                 const p = this.workerPos(d.w);
                 const inj = d.inj;
+                this.injuryAnim(d.w, inj, d.inc, p);
                 this.bubble(inj.serious ? 'SERIOUS INCIDENT' : 'Injury', p.add(vec2(0, 1.8)), '#ef4444', inj.serious ? .8 : .6, 2.5);
                 this.bubble(`${d.w.s.name.split(' ')[0]}: ${inj.label}`, p.add(vec2(0, 1)), '#fecaca', .4, 2.5);
                 this.bubble('Morale -5', p.add(vec2(0, .3)), '#fca5a5', .35, 2);
@@ -336,7 +342,7 @@ const shiftView =
                 playSfx('crash', inj.serious ? 1 : .6);
                 playSfx('glass', .8);
                 playSfx('ominous', 1);
-                hudToast(`🚑 ${d.w.s.name} injured (${inj.label})`, '#ef4444');
+                if (!inj.fatal) hudToast(`🚑 ${d.w.s.name} injured (${inj.label})`, '#ef4444');
                 if (this.selected === d.w.id) this.select(null);
                 break;
             }
@@ -422,6 +428,31 @@ const shiftView =
         }
     },
 
+    injuryAnim(w, inj, inc, p)
+    {
+        const look = w.s.look, vest = ZONE_DEFS[w.zone]?.hex || '#94a3b8';
+        const fall = ()=> this.bodies.push({ pos:p.copy(), look, vest, fatal:!!inj.fatal, life:1, side: Math.random() < .5 ? 1 : -1 });
+        if (inc?.type === 'falling')
+            this.drops.push({ kind:'box', from:p.add(vec2(0, 4.5)), to:p.add(vec2(0, .3)), t:0, dur:.4, spin:.4, hit:true,
+                onLand:()=> { fall(); particleEffect('debris', p.add(vec2(0, .4)), { scale:1.3 }); playSfx('crash', 1); addScreenShake(.4, .4); } });
+        else if (inc?.type === 'strike' || inc?.type === 'forklift')
+        {
+            const to = p.add(vec2(rand(-1.6, 1.6), 1.2));
+            this.drops.push({ kind:'body', look, vest, from:p.copy(), to, t:0, dur:.55, spin:randSign(),
+                onLand:()=> { p.x = to.x; p.y = to.y - 1; fall(); particleEffect('dust', to, { scale:1 }); } });
+            playSfx('horn', 1, 1.7); playSfx('crash', 1);
+        }
+        else fall();
+        if (inj.fatal)
+        {
+            this.drama = { t:0, left:3.4, title:'FATALITY', sub:`${w.s.name} was ${inj.cause}` };
+            playSfx('ominous', 1, .6); playSfx('crash', 1, .5);
+            addScreenShake(.8, 1);
+            hudToast(`🕯️ ${w.s.name} has died.`, '#ef4444');
+        }
+        hudAccident();
+    },
+
     select(id)
     {
         this.selected = id;
@@ -447,8 +478,14 @@ const shiftView =
         // input
         this.handleInput();
 
+        // a fatality freezes the floor for a moment
+        if (this.drama) { this.drama.t += dtReal; this.drama.left -= dtReal; if (this.drama.left <= 0) this.drama = null; }
+        for (const d of this.drops) { d.t += dtReal; if (d.t >= d.dur && !d.landed) { d.landed = true; d.onLand && d.onLand(); } }
+        this.drops = this.drops.filter(d => d.t < d.dur + (d.kind === 'box' && !d.hit ? 1.2 : 0));
+        for (const bd of this.bodies) if (!bd.fatal) bd.life -= dtReal / 4;
+        this.bodies = this.bodies.filter(bd => bd.fatal || bd.life > 0);
         // simulate
-        if (!this.paused && !this.sim.done)
+        if (!this.paused && !this.sim.done && !this.drama)
         {
             const steps = this.speed;
             for (let i = 0; i < steps && !this.sim.done; i++) this.sim.step(dtReal);
@@ -500,8 +537,8 @@ const shiftView =
                 if (inc.done) continue;
                 const w = sim.worker(inc.workerId);
                 if (!w) continue;
-                const p = this.workerPos(w).add(vec2(0, 1.6));
-                if (mp.distance(p) < 1.5) { sim.intervene(inc.id); return; }
+                const p = this.workerPos(w).add(vec2(0, inc.type === 'falling' ? 3.6 : 1.7));
+                if (mp.distance(p) < 1.6) { sim.intervene(inc.id); return; }
             }
             // 2. breakdown badges
             for (const z of ZONE_KEYS)
@@ -591,44 +628,90 @@ const shiftView =
     },
 
     // ---------------------------------------------------------------- render
+    // Everything is drawn with Canvas2D in a world-space transform so we get
+    // chunky rounded shapes, thick outlines and drop shadows.
     render()
     {
         if (!this.active || !this.sim) return;
-        const sim = this.sim;
-        const R = this.rects;
-        const T = timeReal;
-        // floor
-        drawRect(this.bounds.center, this.bounds.size.add(vec2(2)), WM_FLOOR);
-        // roads, walkways and zebra crossings
-        this.drawRoads();
-        // overhead conveyors bridge the roads (buildings hide the rest)
-        this.drawConveyors();
-        // dock + bay
-        this.drawDock();
-        // zones
-        for (const z of ZONE_KEYS) this.drawZone(z);
-        this.drawBench();
-        // parcels in flight
-        for (const f of this.flyers) f.draw();
-        // forklift traffic
-        for (const f of sim.forklifts) this.drawForklift(f);
-        // workers (dragged one last)
-        const order = sim.workers.filter(w => !w.injured).sort((a, b)=> (this.drag?.id === a.id) - (this.drag?.id === b.id));
-        for (const w of order) this.drawWorker(w);
-        // incident warnings on top
-        for (const inc of sim.incidents) if (!inc.done) this.drawIncident(inc);
-        // drop target highlight
+        const sim = this.sim, R = this.rects, T = timeReal;
+        const ctx = NX.world();
+        // outdoor ground + building floor with tiles
+        const b = this.bounds;
+        NX.rr(ctx, b.center.x, b.center.y - .2, b.size.x + 1.6, b.size.y + 1.6, 1.2, '#6c7a96', null, 0);
+        NX.rr(ctx, b.center.x, b.center.y, b.size.x + 1.6, b.size.y + 1.6, 1.2, '#f3e9d6', NX.O, .22);
+        ctx.strokeStyle = 'rgba(160,130,90,.13)'; ctx.lineWidth = .05;
+        ctx.beginPath();
+        for (let x = Math.floor(b.center.x - b.size.x/2); x < b.center.x + b.size.x/2; x += 2) { ctx.moveTo(x, b.center.y - b.size.y/2); ctx.lineTo(x, b.center.y + b.size.y/2); }
+        for (let y = Math.floor(b.center.y - b.size.y/2); y < b.center.y + b.size.y/2; y += 2) { ctx.moveTo(b.center.x - b.size.x/2, y); ctx.lineTo(b.center.x + b.size.x/2, y); }
+        ctx.stroke();
+        this.drawRoads(ctx);
+        this.drawConveyors(ctx);
+        this.drawDock(ctx);
+        for (const z of ZONE_KEYS) this.drawZone(ctx, z);
+        this.drawBench(ctx);
+        // bodies & memorial sheets stay where people fell
+        for (const bd of this.bodies) this.drawBody(ctx, bd);
+        for (const f of this.flyers) f.draw(ctx);
+        for (const f of sim.forklifts) this.drawForklift(ctx, f);
+        const order = sim.workers.filter(w => !w.injured).sort((a, c)=> (this.drag?.id === a.id) - (this.drag?.id === c.id) || this.workerPos(c).y - this.workerPos(a).y);
+        for (const w of order) this.drawWorker(ctx, w);
+        for (const d of this.drops) this.drawDrop(ctx, d);
+        for (const inc of sim.incidents) if (!inc.done) this.drawIncident(ctx, inc);
         if (this.drag?.moved && this.hoverZone)
         {
             const r = R[this.hoverZone];
             const pulse = .5 + .5 * Math.sin(T * 10);
-            drawRect(r.pos, r.size.add(vec2(.3)), new Color(1, 1, 1, .12 + pulse * .1));
-            const w = sim.worker(this.drag.id);
-            if (w && this.hoverZone !== 'bench')
+            NX.rr(ctx, r.pos.x, r.pos.y, r.size.x + .5, r.size.y + .5, .8, `rgba(255,255,255,${.25 + pulse * .2})`, '#fff', .18);
+        }
+        NX.done(ctx);
+        // labels on top (text is drawn unflipped)
+        this.drawLabels();
+        if (this.drag?.moved && this.hoverZone && this.hoverZone !== 'bench')
+        {
+            const r = R[this.hoverZone], w = sim.worker(this.drag.id);
+            if (w)
             {
-                const rt = zoneRating(w.s, this.hoverZone);
-                wmText(`${'★'.repeat(Math.round(starsFor(rt)))}${'☆'.repeat(5 - Math.round(starsFor(rt)))}  fit`, r.pos.add(vec2(0, -r.size.y/2 + .6)), .5, rt >= 12 ? wmHex('#fde047') : WHITE, .08, BLACK);
+                const st = Math.round(starsFor(zoneRating(w.s, this.hoverZone)));
+                wmText(`${'★'.repeat(st)}${'☆'.repeat(5 - st)}`, r.pos.add(vec2(0, -r.size.y/2 + .7)), .7, wmHex(st >= 3 ? '#ffd23f' : '#ffffff'), .16, wmHex(NX.O));
             }
+        }
+    },
+
+    drawLabels()
+    {
+        const R = this.rects, sim = this.sim, O = wmHex(NX.O);
+        for (const z of ZONE_KEYS)
+        {
+            const r = R[z], def = ZONE_DEFS[z], zone = sim.zones[z];
+            const hy = r.pos.y + r.size.y/2 - .5;
+            wmText(r.size.x * cameraScale < 170 ? def.icon : `${def.icon} ${def.name.toUpperCase()}`, vec2(r.pos.x - r.size.x/2 + .35, hy), .44, WHITE, .14, O, 'left', undefined, undefined, r.size.x - 2.4);
+            const q = zone.queue.length;
+            wmText(`${q}/${sim.cap}`, vec2(r.pos.x + r.size.x/2 - .35, hy), .4, q >= sim.cap ? wmHex('#ffe066') : WHITE, .14, O, 'right');
+            if (!zone.rushFirst && z !== 'black') wmText('FIFO', vec2(r.pos.x + r.size.x/2 - 1.9, hy), .3, wmHex('#e2e8f0'), .1, O);
+            if (q >= sim.cap) wmText('FULL!', r.pos.add(vec2(-r.size.x/2 + 1.75, -r.size.y/2 + 2.9)), .5, wmHex('#ff4d4d'), .14, WHITE);
+            const crew = sim.zoneWorkers(z);
+            if (!crew.length && z !== 'black' && q > 0) wmText('NO CREW!', r.pos.add(vec2(1.3, 0)), .5, wmHex('#ff4d4d'), .14, WHITE);
+            if (zone.broken && !zone.contractor && !sim.crewCount('black')) wmText('tap: call contractor', r.pos.add(vec2(r.size.x/2 - 1.3, r.size.y/2 - 2.4)), .26, wmHex('#c2410c'), .08, WHITE);
+        }
+        const bn = R.bench;
+        wmText(bn.size.x >= bn.size.y ? `☕ BREAK ROOM  ·  lvl ${sim.fac.breakroom}  ·  drag tired staff here` : '☕ BREAK ROOM', bn.size.x >= bn.size.y ? vec2(bn.pos.x - bn.size.x/2 + .45, bn.pos.y + bn.size.y/2 - .42) : bn.pos.add(vec2(0, bn.size.y/2 - .45)), .36, WHITE, .12, O, bn.size.x >= bn.size.y ? 'left' : 'center');
+        const d = R.dock, long = d.size.y >= d.size.x;
+        wmText('DOCK', d.pos.add(long ? vec2(0, d.size.y/2 - .4) : vec2(-d.size.x/2 + .9, 0)), .36, WHITE, .12, O);
+        wmText(`🚛${sim.dock}`, d.pos.add(long ? vec2(0, -d.size.y/2 + .5) : vec2(d.size.x/2 - .9, 0)), .42, sim.dock > 40 ? wmHex('#ff4d4d') : WHITE, .12, O);
+        const by = R.bay, bl = by.size.y >= by.size.x;
+        wmText('BAY', by.pos.add(bl ? vec2(0, by.size.y/2 - .4) : vec2(-by.size.x/2 + .7, 0)), .36, WHITE, .12, O);
+        wmText(`${sim.stats.shipped * UNITS_PER_PARCEL}`, by.pos.add(bl ? vec2(0, -by.size.y/2 + .5) : vec2(by.size.x/2 - .9, 0)), .4, wmHex('#7ed957'), .12, O);
+        for (const w of sim.workers)
+        {
+            if (w.injured) continue;
+            const p = this.workerPos(w);
+            wmText(w.s.nickname || w.s.name.split(' ')[0], p.add(vec2(0, -1.02)), .28, w.s.homegrown ? wmHex('#b8f28c') : WHITE, .1, O);
+        }
+        for (const inc of sim.incidents) if (!inc.done)
+        {
+            const w = sim.worker(inc.workerId); if (!w) continue;
+            const p = this.workerPos(w).add(vec2(0, inc.type === 'falling' ? 3.6 : 1.7));
+            wmText('TAP!', p.add(vec2(0, -1.15)), .42, wmHex('#fff3a0'), .14, O);
         }
     },
 
@@ -636,303 +719,469 @@ const shiftView =
     {
         if (!this.active || !this.sim) return;
         for (const b of this.bubbles) b.draw();
-        // red vignette on serious incidents
+        const s = mainCanvasSize, ctx = mainContext;
         if (this.vignette > 0)
         {
-            const a = Math.min(.45, this.vignette * .3);
-            const s = mainCanvasSize;
-            const ctx = mainContext;
+            const a = Math.min(.5, this.vignette * .3);
             const g = ctx.createRadialGradient(s.x/2, s.y/2, Math.min(s.x, s.y) * .25, s.x/2, s.y/2, Math.max(s.x, s.y) * .7);
             g.addColorStop(0, 'rgba(220,30,30,0)');
             g.addColorStop(1, `rgba(220,30,30,${a})`);
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, s.x, s.y);
         }
-        if (this.paused && !this.sim.done)
-            drawTextScreen('PAUSED', mainCanvasSize.scale(.5), Math.min(80, mainCanvasSize.x * .12), new Color(1,1,1,.85), 6, BLACK);
-    },
-
-    drawDock()
-    {
-        const R = this.rects, sim = this.sim;
-        const d = R.dock;
-        drawRect(d.pos, d.size, wmHex('#111827'));
-        const long = d.size.y >= d.size.x;
-        for (let i = -2; i <= 2; i++)
-            long ? drawRect(d.pos.add(vec2(0, i * 1.1)), vec2(d.size.x, .07), wmHex('#fbbf24', .35))
-                 : drawRect(d.pos.add(vec2(i * 1.1, 0)), vec2(.07, d.size.y), wmHex('#fbbf24', .35));
-        wmText('DOCK', d.pos.add(long ? vec2(0, d.size.y/2 - .35) : vec2(-d.size.x/2 + .8, 0)), .38, wmHex('#93c5fd'));
-        const n = sim.dock;
-        wmText(`🚛 ${n}`, d.pos.add(long ? vec2(0, .9) : vec2(1.2, 0)), .5, n > 40 ? wmHex('#f87171') : n > 15 ? wmHex('#fbbf24') : WHITE, .08, BLACK);
-        for (let i = 0; i < Math.min(n, 12); i++)
+        if (this.drama)
         {
-            const p = long ? d.pos.add(vec2(-.35 + (i % 2) * .7, -.3 - Math.floor(i / 2) * .45)) : d.pos.add(vec2(-1.6 + Math.floor(i / 2) * .45, -.35 + (i % 2) * .7));
-            drawRect(p, vec2(.38), wmHex('#c8a165', .9));
+            // fatality: the world drains of colour, everything stops
+            const a = Math.min(1, this.drama.t * 2) * Math.min(1, this.drama.left);
+            ctx.fillStyle = `rgba(10,10,20,${.72 * a})`;
+            ctx.fillRect(0, 0, s.x, s.y);
+            const fs = Math.min(64, s.x * .09);
+            drawTextScreen('🕯️', vec2(s.x/2, s.y/2 - fs * 1.4), fs * 1.2, new Color(1,1,1,a));
+            drawTextScreen(this.drama.title, vec2(s.x/2, s.y/2), fs, new Color(1, .3, .3, a), fs * .08, new Color(0,0,0,a));
+            drawTextScreen(this.drama.sub, vec2(s.x/2, s.y/2 + fs * .95), fs * .38, new Color(1,1,1,a), fs * .03, new Color(0,0,0,a));
         }
-        const b = R.bay;
-        drawRect(b.pos, b.size, wmHex('#111827'));
-        const blong = b.size.y >= b.size.x;
-        wmText('BAY', b.pos.add(blong ? vec2(0, b.size.y/2 - .35) : vec2(-b.size.x/2 + .7, 0)), .36, wmHex('#fca5a5'));
-        wmText('🚚', b.pos, .9);
-        wmText(`${sim.stats.shipped * UNITS_PER_PARCEL}`, b.pos.add(blong ? vec2(0, -1.1) : vec2(1.4, 0)), .4, wmHex('#86efac'), .06, BLACK);
+        if (this.paused && !this.sim.done && !this.drama)
+            drawTextScreen('PAUSED', s.scale(.5), Math.min(80, s.x * .12), WHITE, 10, wmHex(NX.O));
     },
 
-    drawRoads()
+    drawDock(ctx)
     {
-        const T = this.sim.t;
-        const asphalt = wmHex('#262a31'), edge = wmHex('#facc15', .85), dash = new Color(1, 1, 1, .35);
-        const rect = (pos, size, color)=> drawRect(this.T(pos), this.TS(size), color);
-        // walkways (green, hatched edges)
+        const R = this.rects, sim = this.sim, T = timeReal;
+        for (const key of ['dock', 'bay'])
+        {
+            const d = R[key];
+            NX.rr(ctx, d.pos.x, d.pos.y - .15, d.size.x, d.size.y, .5, NX.SHADOW, null, 0);
+            NX.rr(ctx, d.pos.x, d.pos.y, d.size.x, d.size.y, .5, '#4b5875', NX.O, .14);
+            const long = d.size.y >= d.size.x;
+            // roller doors
+            for (let i = -1; i <= 1; i++)
+            {
+                const dx = long ? 0 : i * d.size.x * .28, dy = long ? i * d.size.y * .26 : 0;
+                NX.rr(ctx, d.pos.x + dx, d.pos.y + dy, long ? d.size.x * .7 : d.size.x * .22, long ? d.size.y * .2 : d.size.y * .6, .15, '#9fb0cc', NX.O, .08);
+            }
+            if (key === 'dock')
+                for (let i = 0; i < Math.min(sim.dock, 12); i++)
+                {
+                    const p = long ? { x: d.pos.x - .4 + (i % 2) * .8, y: d.pos.y + d.size.y/2 - 1.1 - Math.floor(i / 2) * .5 } : { x: d.pos.x - d.size.x/2 + 1 + Math.floor(i / 2) * .5, y: d.pos.y - .4 + (i % 2) * .8 };
+                    NX.box(ctx, p.x, p.y, .42, '#d9a066');
+                }
+            else NX.truck(ctx, d.pos.x, d.pos.y, long, T);
+        }
+    },
+
+    drawRoads(ctx)
+    {
+        const T = this.sim.t, RW = WH_MAP.RW;
+        const rect = (pos, size, fill, stroke, lw, r = 0)=> { const p = this.T(pos), sz = this.TS(size); NX.rr(ctx, p.x, p.y, sz.x, sz.y, r, fill, stroke, lw); };
         for (const wk of WH_MAP.walkways)
         {
-            rect(wk.pos, wk.size, wmHex('#14532d', .55));
+            rect(wk.pos, wk.size, '#9be8b4', null, 0, .25);
             const horiz = wk.size.x > wk.size.y;
-            for (const sgn of [-1, 1])
-                horiz ? rect({ x:wk.pos.x, y:wk.pos.y + sgn * (wk.size.y/2 - .04) }, { x:wk.size.x, y:.06 }, wmHex('#4ade80', .5))
-                      : rect({ x:wk.pos.x + sgn * (wk.size.x/2 - .04), y:wk.pos.y }, { x:.06, y:wk.size.y }, wmHex('#4ade80', .5));
+            // footprints
+            for (let t = -((horiz ? wk.size.x : wk.size.y) / 2) + .8; t < (horiz ? wk.size.x : wk.size.y) / 2; t += 2.2)
+            {
+                const p = horiz ? { x:wk.pos.x + t, y:wk.pos.y } : { x:wk.pos.x, y:wk.pos.y + t };
+                const q = this.T(p);
+                NX.ell(ctx, q.x - .12, q.y + .08, .09, .14, 'rgba(46,140,80,.35)');
+                NX.ell(ctx, q.x + .12, q.y - .08, .09, .14, 'rgba(46,140,80,.35)');
+            }
         }
-        // roads
         for (const r of WH_MAP.roads)
         {
-            rect(r.pos, r.size, asphalt);
-            const RW = WH_MAP.RW;
-            if (r.horiz)
-            {
-                for (const sgn of [-1, 1]) rect({ x:r.pos.x, y:r.pos.y + sgn * (RW/2 - .07) }, { x:r.size.x, y:.09 }, edge);
-                for (let x = r.pos.x - r.size.x/2 + .6; x < r.pos.x + r.size.x/2; x += 1.6) rect({ x, y:r.pos.y }, { x:.7, y:.07 }, dash);
-            }
-            else
-            {
-                for (const sgn of [-1, 1]) rect({ x:r.pos.x + sgn * (RW/2 - .07), y:r.pos.y }, { x:.09, y:r.size.y }, edge);
-                for (let y = r.pos.y - r.size.y/2 + .6; y < r.pos.y + r.size.y/2; y += 1.6) rect({ x:r.pos.x, y }, { x:.07, y:.7 }, dash);
-            }
-            // one-way arrows drifting with the traffic
+            rect(r.pos, r.size, '#5d6b82', NX.O, .1, .3);
             const len = r.horiz ? r.size.x : r.size.y;
+            for (const sgn of [-1, 1])
+                rect(r.horiz ? { x:r.pos.x, y:r.pos.y + sgn * (RW/2 - .16) } : { x:r.pos.x + sgn * (RW/2 - .16), y:r.pos.y }, r.horiz ? { x:r.size.x - .4, y:.11 } : { x:.11, y:r.size.y - .4 }, '#ffd23f', null, 0, .05);
+            for (let t = -len/2 + .6; t < len/2; t += 1.6)
+                rect(r.horiz ? { x:r.pos.x + t, y:r.pos.y } : { x:r.pos.x, y:r.pos.y + t }, r.horiz ? { x:.75, y:.09 } : { x:.09, y:.75 }, 'rgba(255,255,255,.55)', null, 0, .04);
             const off = (T * 1.5) % 6;
             for (let t = -len/2 + 1.5 + off; t < len/2 - 1; t += 6)
             {
-                const c = { x:r.pos.x + r.dir.x * t, y:r.pos.y + r.dir.y * t };
-                const d = r.dir, n = { x:-d.y, y:d.x };
-                const pts = [{ x:c.x + d.x * .45, y:c.y + d.y * .45 }, { x:c.x - d.x * .3 + n.x * .38, y:c.y - d.y * .3 + n.y * .38 }, { x:c.x - d.x * .3 - n.x * .38, y:c.y - d.y * .3 - n.y * .38 }]
-                    .map(p => this.T(p));
-                drawPoly(pts, new Color(1, 1, 1, .12));
+                const c = { x:r.pos.x + r.dir.x * t, y:r.pos.y + r.dir.y * t }, d = r.dir, n = { x:-d.y, y:d.x };
+                const pts = [{ x:c.x + d.x * .45, y:c.y + d.y * .45 }, { x:c.x - d.x * .3 + n.x * .4, y:c.y - d.y * .3 + n.y * .4 }, { x:c.x - d.x * .1, y:c.y - d.y * .1 }, { x:c.x - d.x * .3 - n.x * .4, y:c.y - d.y * .3 - n.y * .4 }].map(p => this.T(p));
+                NX.poly(ctx, pts, 'rgba(255,255,255,.22)');
             }
-            wmText(r.horiz ? 'FORKLIFTS ONLY' : '', this.T({ x:r.pos.x + (r.key === 'main' ? -4.6 : 4.6), y:r.pos.y }), .3, new Color(1, .85, .2, .35), 0, BLACK, 'center', undefined, undefined, undefined, this.portrait ? -Math.PI/2 : 0);
         }
-        // zebra crossings
         WH_MAP.crosswalks.forEach((cw, i)=>
         {
             const users = this.sim.cwUsers[i];
             const waiting = this.sim.workers.some(w => w.state === 'waitCross' && w.path && w.path[w.pathI]?.cw === cw);
             const pulse = .5 + .5 * Math.sin(timeReal * 8);
-            const c = users ? wmHex('#fde047', .9) : waiting ? new Color(1, 1, 1, .55 + .35 * pulse) : new Color(1, 1, 1, .7);
-            for (let k = -2; k <= 2; k++) rect({ x:cw.x, y:cw.y + k * .42 }, { x:1.3, y:.22 }, c);
-            // stop lines for forklifts
-            rect({ x:cw.x + (cw.road === 'main' ? -1.05 : 1.05), y:cw.y }, { x:.1, y:WH_MAP.RW - .2 }, wmHex('#ef4444', .7));
+            const c = users ? '#ffd23f' : waiting ? `rgba(255,255,255,${.6 + .4 * pulse})` : '#ffffff';
+            for (let k = -2; k <= 2; k++) rect({ x:cw.x, y:cw.y + k * .42 }, { x:1.35, y:.24 }, c, null, 0, .06);
+            rect({ x:cw.x + (cw.road === 'main' ? -1.05 : 1.05), y:cw.y }, { x:.12, y:RW - .35 }, '#ff4d4d', null, 0, .05);
         });
     },
 
-    drawForklift(f)
-    {
-        const lp = WH_MAP.loopPos(f.s);
-        const pos = this.T(lp);
-        const h = this.T({ x:lp.dx, y:lp.dy });
-        const n = vec2(-h.y, h.x);
-        const ang = Math.atan2(-h.y, h.x);
-        const o = (a, b)=> pos.add(h.scale(a)).add(n.scale(b));
-        const T = timeReal;
-        // blue pedestrian-warning spot projected ahead
-        drawCircleGradient(o(2.3, 0), 1.7, new Color(.2, .5, 1, f.speed > .3 ? .45 : .2), new Color(.2, .5, 1, 0));
-        drawEllipse(o(0, -.05), vec2(1.9, 1.3), new Color(0, 0, 0, .35), ang);
-        drawRect(o(-.15, 0), vec2(1.35, 1.0), wmHex('#f59e0b'), ang);          // body
-        drawRect(o(-.78, 0), vec2(.22, .98), wmHex('#374151'), ang);           // counterweight
-        drawRect(o(-.3, 0), vec2(.62, .72), wmHex('#1f2937'), ang);            // cab
-        drawRect(o(.58, 0), vec2(.14, .92), wmHex('#111827'), ang);            // mast
-        drawRect(o(1.0, .26), vec2(.78, .1), wmHex('#9ca3af'), ang);           // forks
-        drawRect(o(1.0, -.26), vec2(.78, .1), wmHex('#9ca3af'), ang);
-        if (f.load) { drawRect(o(1.02, 0), vec2(.7, .8), WM_PKG_COLORS[f.load] || WM_PKG_COLORS.standard, ang); drawRect(o(1.02, 0), vec2(.7, .08), new Color(0,0,0,.25), ang); }
-        const brake = f.braking || f.stopT > 0 || f.hold;
-        for (const sgn of [-1, 1]) drawRect(o(-.88, sgn * .36), vec2(.08, .18), brake ? wmHex('#ff2d2d') : wmHex('#7f1d1d'), ang);
-        const blink = Math.sin(T * 9 + f.id) > 0;
-        drawCircle(o(-.3, 0), .3, blink ? wmHex('#fb923c') : wmHex('#9a3412'));
-        if (f.hold)
-        {
-            const w = this.sim.worker(f.hold.workerId);
-            if (w) drawLine(pos, this.workerPos(w), .12, new Color(1, .15, .1, .5 + .5 * Math.sin(T * 14)));
-            wmText('‼️', o(0, 0).add(vec2(0, 1)), .7);
-        }
-    },
-
-    drawConveyors()
+    drawConveyors(ctx)
     {
         const R = this.rects, T = this.sim.t;
-        const link = (a, b, color, w = .3)=>
+        const link = (a, b, color, w = .34)=>
         {
             const pa = R[a].pos, pb = R[b].pos;
             const dir = pb.subtract(pa), len = dir.length(), n = dir.normalize();
-            // only the exposed overhead span between the two buildings is visible
-            drawLine(pa, pb, w + .12, new Color(0, 0, 0, .35));
-            drawLine(pa, pb, w, color);
-            const step = 1.2, off = (T * 2) % step;
-            for (let d = off; d < len; d += step) drawRect(pa.add(n.scale(d)), vec2(.14), new Color(1, 1, 1, .3), Math.atan2(n.x, n.y));
+            NX.line(ctx, pa.x, pa.y - .12, pb.x, pb.y - .12, w + .12, NX.SHADOW);
+            NX.line(ctx, pa.x, pa.y, pb.x, pb.y, w + .14, NX.O);
+            NX.line(ctx, pa.x, pa.y, pb.x, pb.y, w, color);
+            const off = (T * 2) % 1.1;
+            for (let d = off; d < len; d += 1.1) { const p = pa.add(n.scale(d)); NX.circ(ctx, p.x, p.y, w * .22, 'rgba(255,255,255,.7)'); }
         };
-        const belt = wmHex('#475569', .85);
-        for (let i = 0; i < FLOW_STANDARD.length - 1; i++) link(FLOW_STANDARD[i], FLOW_STANDARD[i+1], belt);
-        link('blue', 'purple', wmHex('#6d28d9', .8), .2);
-        link('purple', 'orange', wmHex('#6d28d9', .8), .2);
-        link('dock', 'blue', belt);
-        link('red', 'bay', belt);
+        for (let i = 0; i < FLOW_STANDARD.length - 1; i++) link(FLOW_STANDARD[i], FLOW_STANDARD[i+1], '#b6c2d6');
+        link('blue', 'purple', '#c8a6ff', .24);
+        link('purple', 'orange', '#c8a6ff', .24);
+        link('dock', 'blue', '#b6c2d6');
+        link('red', 'bay', '#b6c2d6');
     },
 
-    drawZone(z)
+    drawZone(ctx, z)
     {
         const sim = this.sim, zone = sim.zones[z], r = this.rects[z], def = ZONE_DEFS[z];
-        const col = WM_ZONE_COLORS[z];
         const T = timeReal;
         const crew = sim.zoneWorkers(z);
         const busy = crew.filter(w => w.state === 'work' || w.state === 'repair').length;
         const flowing = busy > 0 && zone.queue.length < sim.cap * .6 && !zone.broken;
-        // glow when flowing well
+        const wob = this.zoneGlow[z] ? Math.sin(T * 40) * .06 * this.zoneGlow[z].t : 0;
+        const x = r.pos.x + wob, y = r.pos.y;
+        // glow when flowing
         if (flowing && sim.stats.flow >= 2)
-        {
-            const g = .08 + .05 * sim.stats.flow + .04 * Math.sin(T * 4 + z.length);
-            drawRect(r.pos, r.size.add(vec2(.5)), col.withAlpha(g));
-        }
-        const glow = this.zoneGlow[z];
-        if (glow) drawRect(r.pos, r.size.add(vec2(.6)), wmHex(glow.c, .35 * glow.t));
-        // body
-        drawRect(r.pos, r.size, col.withAlpha(.9));
-        drawRect(r.pos, r.size.subtract(vec2(.22)), WM_PANEL);
-        drawRect(r.pos.add(vec2(0, -.1)), r.size.subtract(vec2(.3, 1.1)), col.withAlpha(.07));
-        // header
-        const hy = r.pos.y + r.size.y/2 - .45;
-        drawRect(vec2(r.pos.x, hy), vec2(r.size.x - .22, .7), col.withAlpha(.35));
-        wmText(`${def.icon} ${def.name.toUpperCase()}`, vec2(r.pos.x - r.size.x/2 + .3, hy), .42, WHITE, .05, BLACK, 'left', undefined, undefined, r.size.x - 2.2);
-        const q = zone.queue.length;
-        const qc = q >= sim.cap ? '#f87171' : q > sim.cap * .6 ? '#fbbf24' : '#e2e8f0';
-        wmText(`${q}/${sim.cap}`, vec2(r.pos.x + r.size.x/2 - .3, hy), .38, wmHex(qc), .05, BLACK, 'right');
-        if (!zone.rushFirst && z !== 'black') wmText('FIFO', vec2(r.pos.x + r.size.x/2 - 1.9, hy), .3, wmHex('#94a3b8'));
-        // queue stack
-        const shown = Math.min(q, 24);
+            NX.rr(ctx, x, y, r.size.x + .7, r.size.y + .7, 1, NX.alpha(def.hex, .25 + .1 * Math.sin(T * 4 + z.length)), null, 0);
+        if (this.zoneGlow[z]) NX.rr(ctx, x, y, r.size.x + .8, r.size.y + .8, 1, NX.alpha(this.zoneGlow[z].c, .5 * this.zoneGlow[z].t), null, 0);
+        // building
+        NX.rr(ctx, x, y - .22, r.size.x, r.size.y, .7, NX.SHADOW, null, 0);
+        NX.rr(ctx, x, y, r.size.x, r.size.y, .7, NX.mix(def.hex, '#ffffff', .78), NX.O, .16);
+        NX.rr(ctx, x, y - .45, r.size.x - .5, r.size.y - 1.4, .45, '#fffaf0', NX.alpha(NX.O, .25), .06);
+        // header pill
+        NX.rr(ctx, x, y + r.size.y/2 - .5, r.size.x - .3, .78, .39, def.hex, NX.O, .1);
+        NX.rr(ctx, x, y + r.size.y/2 - .38, r.size.x - .7, .18, .09, 'rgba(255,255,255,.3)', null, 0);
+        // queue: cute cardboard boxes
+        const q = zone.queue.length, shown = Math.min(q, 24);
         for (let i = 0; i < shown; i++)
         {
-            const p = zone.queue[i];
-            const pos = this.queueSlot(z, i);
-            const c = WM_PKG_COLORS[p.type];
-            drawRect(pos, vec2(.44), c);
-            drawRect(pos.add(vec2(0, .08)), vec2(.44, .06), new Color(0,0,0,.25));
-            if (p.type === 'rush') drawRect(pos, vec2(.56), new Color(1, .85, .1, .25 + .2 * Math.sin(T * 8 + i)));
+            const p = zone.queue[i], pos = this.queueSlot(z, i);
+            NX.box(ctx, pos.x + wob, pos.y, .44, PACKAGE_TYPES[p.type].color, p.type === 'rush' ? .5 + .5 * Math.sin(T * 8 + i) : 0);
         }
-        if (q > 24) wmText(`+${q - 24}`, this.queueSlot(z, 23).add(vec2(.6, 0)), .32, WHITE);
-        // overflow warning
-        if (q >= sim.cap) wmText('FULL', r.pos.add(vec2(-r.size.x/2 + 1.7, -r.size.y/2 + .5 + 2.3)), .45, wmHex('#f87171', .6 + .4 * Math.sin(T * 9)), .06, BLACK);
         // breakdown badge
         if (zone.broken)
         {
-            const b = zone.broken;
-            const p = r.pos.add(vec2(r.size.x/2 - 1.2, r.size.y/2 - 1));
+            const b = zone.broken, p = r.pos.add(vec2(r.size.x/2 - 1.2, r.size.y/2 - 1.6));
             const pulse = .5 + .5 * Math.sin(T * 7);
-            drawCircle(p, 1.6 + pulse * .2, wmHex('#f97316', .25 + pulse * .2));
-            wmText(b.def.icon, p, .7);
+            NX.circ(ctx, p.x, p.y, .85 + pulse * .1, '#ff8a3d', NX.O, .12);
+            NX.gear(ctx, p.x, p.y, .45, T * (zone.contractor ? 6 : 1.5));
             const pr = clamp(b.progress / b.work, 0, 1);
-            drawRect(p.add(vec2(0, -.85)), vec2(1.4, .18), new Color(0,0,0,.6));
-            drawRect(p.add(vec2(-.7 + pr * .7, -.85)), vec2(1.4 * pr, .18), wmHex('#a3e635'));
-            if (!zone.contractor && !sim.crewCount('black')) wmText('tap: contractor', p.add(vec2(0, -1.2)), .26, wmHex('#fdba74'));
+            NX.rr(ctx, p.x, p.y - 1.15, 1.6, .26, .13, '#ffffff', NX.O, .07);
+            if (pr > 0) NX.rr(ctx, p.x - .8 + pr * .8, p.y - 1.15, 1.6 * pr, .26, .13, '#7ed957', null, 0);
         }
-        // empty zone hint
-        if (!crew.length && z !== 'black' && q > 0) wmText('NO CREW', r.pos.add(vec2(1.4, 0)), .5, wmHex('#f87171', .6 + .4 * Math.sin(T * 6)), .06, BLACK);
-        if (z === 'black' && !crew.length) wmText('no maintenance cover', r.pos.add(vec2(0, -.3)), .32, wmHex('#94a3b8'));
     },
 
-    drawBench()
+    drawBench(ctx)
     {
         const r = this.rects.bench;
-        drawRect(r.pos, r.size, wmHex('#475569'));
-        drawRect(r.pos, r.size.subtract(vec2(.2)), wmHex('#1e293b'));
-        if (r.size.x >= r.size.y) wmText(`☕ BREAK ROOM  (lvl ${this.sim.fac.breakroom})  — drag staff here to rest · scheduled meal breaks cross the forklift roads`, vec2(r.pos.x - r.size.x/2 + .3, r.pos.y + r.size.y/2 - .35), .34, wmHex('#cbd5e1'), 0, BLACK, 'left');
-        else wmText('☕ BREAK ROOM', r.pos.add(vec2(0, r.size.y/2 - .4)), .34, wmHex('#cbd5e1'), 0, BLACK);
+        NX.rr(ctx, r.pos.x, r.pos.y - .2, r.size.x, r.size.y, .7, NX.SHADOW, null, 0);
+        NX.rr(ctx, r.pos.x, r.pos.y, r.size.x, r.size.y, .7, '#ffe1a8', NX.O, .16);
+        // sofas & coffee
+        const long = r.size.x >= r.size.y;
+        for (let i = -3; i <= 3; i += 2)
+        {
+            const p = long ? { x:r.pos.x + i * r.size.x * .13, y:r.pos.y - .65 } : { x:r.pos.x - .65, y:r.pos.y + i * r.size.y * .13 };
+            NX.rr(ctx, p.x, p.y, long ? 2.2 : .7, long ? .7 : 2.2, .3, '#ff7b9c', NX.O, .08);
+        }
     },
 
-    drawWorker(w)
+    // ---------------------------------------------------------------- characters
+    workerMood(w)
+    {
+        if (w.incident) return 'shocked';
+        if (w.jay) return 'angry';
+        if (w.state === 'waitCross' && w.crossWait > this.sim.patienceOf(w) * .7) return 'angry';
+        if (w.energy < 25) return 'sad';
+        if ((w.state === 'work' && this.sim.stats.flow >= 3) || (this.vis[w.id]?.hop || 0) > 0 || w.zone === 'bench') return 'happy';
+        return 'neutral';
+    },
+    drawWorker(ctx, w)
     {
         const v = this.vis[w.id]; if (!v) return;
-        const T = timeReal;
-        const s = w.s;
+        const T = timeReal, s = w.s;
         const dragging = this.drag?.id === w.id && this.drag.moved;
         let p = v.pos.copy();
         const working = w.state === 'work' || w.state === 'repair';
-        const tired = w.energy < 25;
-        if (working && !this.paused) p.y += Math.abs(Math.sin(w.anim * (8 + (s.attrs.workRate - 10) * .3))) * .08;
-        if (w.jay) drawCircle(p.add(vec2(0, .2)), 1.3, new Color(1, .1, .1, .25 + .2 * Math.sin(T * 16)));
-        if (v.hop) p.y += Math.sin(v.hop / .25 * Math.PI) * .25;
-        if (w.state === 'walk') p.y += Math.abs(Math.sin(T * (w.jay ? 22 : 14))) * .12;
-        const scaleY = tired ? .88 : 1;
-        const zc = w.zone === 'bench' ? wmHex('#64748b') : WM_ZONE_COLORS[w.zone];
-        const sel = this.selected === w.id;
-        if (sel || dragging) drawCircle(p.add(vec2(0, .35)), 1.5, new Color(1, 1, 1, .18 + .08 * Math.sin(T * 8)));
-        // shadow
-        drawEllipse(p.add(vec2(0, -.42)), vec2(.8, .25), new Color(0,0,0,.35));
-        // body + hi-vis
-        drawRect(p.add(vec2(0, -.05 * scaleY)), vec2(.62, .66 * scaleY), zc);
-        drawRect(p.add(vec2(0, -.02)), vec2(.62, .1), wmHex('#fde047', .9));
-        // head
-        const headY = .48 * scaleY - (tired ? .08 : 0);
-        drawCircle(p.add(vec2(tired ? .06 * v.face : 0, headY)), .46, WM_SKIN[s.id % WM_SKIN.length]);
-        // hard hat
-        drawEllipse(p.add(vec2(0, headY + .14)), vec2(.5, .22), w.zone === 'black' ? wmHex('#f8fafc') : wmHex('#facc15'));
+        const walking = this.sim.isWalking(w) && w.state === 'walk';
+        let squash = 1, bob = 0;
+        if (working && !this.paused) { const ph = Math.sin(w.anim * (9 + (s.attrs.workRate - 10) * .3)); bob = Math.abs(ph) * .1; squash = 1 - Math.max(0, -ph) * .06; }
+        if (walking) bob = Math.abs(Math.sin(T * (w.jay ? 22 : 14))) * .14;
+        if (v.hop) bob += Math.sin(v.hop / .25 * Math.PI) * .3;
+        if (dragging) { bob = .35 + Math.sin(T * 12) * .06; }
+        const sel = this.selected === w.id || dragging;
+        if (sel) NX.circ(ctx, p.x, p.y + .2, .85 + .05 * Math.sin(T * 8), 'rgba(255,255,255,.35)', '#ffffff', .08);
+        if (w.jay) NX.circ(ctx, p.x, p.y + .2, 1 + .1 * Math.sin(T * 16), 'rgba(255,60,60,.3)', '#ff4d4d', .08);
+        const vest = w.zone === 'bench' ? '#94a3b8' : ZONE_DEFS[w.zone].hex;
+        NX.chibi(ctx, p.x, p.y + bob, { look:s.look, vest, mood:this.workerMood(w), face:v.face, squash, step: walking ? Math.sin(T * (w.jay ? 22 : 14)) : 0, blink:(T + w.id * .37) % 4 < .12, homegrown:!!s.homegrown, sleepy:w.zone === 'bench' && w.state === 'break' });
         // carried parcel
-        if (w.pkg)
+        if (w.pkg && !this.sim.isWalking(w))
         {
-            drawRect(p.add(vec2(.36 * v.face, -.02)), vec2(.36), WM_PKG_COLORS[w.pkg.type]);
+            NX.box(ctx, p.x + .42 * v.face, p.y + bob - .05, .36, PACKAGE_TYPES[w.pkg.type].color);
             if (w.state === 'work')
             {
                 const pr = clamp(w.progress, 0, 1);
-                drawRect(p.add(vec2(0, -.62)), vec2(.8, .1), new Color(0,0,0,.6));
-                drawRect(p.add(vec2(-.4 + pr * .4, -.62)), vec2(.8 * pr, .1), wmHex('#7dd3fc'));
+                NX.rr(ctx, p.x, p.y - .66, .9, .14, .07, '#ffffff', NX.O, .05);
+                if (pr > 0) NX.rr(ctx, p.x - .45 + pr * .45, p.y - .66, .9 * pr, .14, .07, '#3ec1ff', null, 0);
             }
         }
-        // energy bar
+        // energy pip bar
         const e = clamp(w.energy / 100, 0, 1);
-        drawRect(p.add(vec2(0, -.76)), vec2(.8, .09), new Color(0,0,0,.6));
-        drawRect(p.add(vec2(-.4 + e * .4, -.76)), vec2(.8 * e, .09), e > .5 ? wmHex('#4ade80') : e > .25 ? wmHex('#facc15') : wmHex('#ef4444'));
-        // name + state icon
-        wmText(s.name.split(' ')[0], p.add(vec2(0, -1.02)), .3, WHITE, .05, BLACK);
-        let icon = '';
+        NX.rr(ctx, p.x, p.y - .84, .8, .12, .06, '#ffffff', NX.O, .04);
+        if (e > 0) NX.rr(ctx, p.x - .4 + e * .4, p.y - .84, .8 * e, .12, .06, e > .5 ? '#7ed957' : e > .25 ? '#ffd23f' : '#ff4d4d', null, 0);
+        // crossing patience
         if (w.state === 'waitCross')
         {
             const pt = clamp(w.crossWait / this.sim.patienceOf(w), 0, 1);
-            drawRect(p.add(vec2(0, 1.25)), vec2(.9, .12), new Color(0,0,0,.6));
-            drawRect(p.add(vec2(-.45 + pt * .45, 1.25)), vec2(.9 * pt, .12), pt < .6 ? wmHex('#facc15') : wmHex('#ef4444'));
-            icon = pt >= 1 ? '😤' : '⏳';
+            NX.pie(ctx, p.x + .6, p.y + 1.25, .32, pt, pt < .6 ? '#ffd23f' : '#ff4d4d');
         }
-        else if (w.jay) icon = '🏃';
+        // state icon bubble
+        let icon = '';
+        if (w.state === 'waitCross') icon = '⏳';
+        else if (w.jay) icon = '💨';
         else if (this.sim.isWalking(w) && w.selfBreak) icon = '🍔';
         else if (w.state === 'blocked') icon = '⛔';
         else if (w.state === 'repair') icon = '🔧';
-        else if (w.zone === 'bench') icon = '☕';
-        else if (tired) icon = '😩';
-        else if (w.state === 'idle' && w.zone !== 'black') icon = '…';
-        if (icon) wmText(icon, p.add(vec2(.45, .85)), .34);
+        else if (w.zone === 'bench') icon = '💤';
+        else if (w.energy < 25) icon = '💦';
+        if (icon) this.iconQueue.push([icon, p.add(vec2(-.55, 1.15 + bob))]);
     },
 
-    drawIncident(inc)
+    drawBody(ctx, bd)
+    {
+        const T = timeReal;
+        const a = bd.fatal ? 1 : clamp(bd.life, 0, 1);
+        ctx.globalAlpha = a;
+        if (bd.fatal)
+        {
+            NX.ell(ctx, bd.pos.x, bd.pos.y - .1, 1.1, .45, 'rgba(120,0,0,.35)');
+            NX.rr(ctx, bd.pos.x, bd.pos.y, 1.8, .7, .35, '#f8fafc', NX.O, .1);
+            NX.circ(ctx, bd.pos.x - .7, bd.pos.y, .32, '#f8fafc', NX.O, .08);
+            this.iconQueue.push(['🌷', bd.pos.add(vec2(.9, .45))]);
+        }
+        else
+        {
+            NX.chibi(ctx, bd.pos.x, bd.pos.y, { look:bd.look, vest:bd.vest, mood:'dizzy', angle:-Math.PI / 2 * bd.side, face:1 });
+            for (let i = 0; i < 3; i++) { const an = T * 4 + i * 2.1; this.iconQueue.push(['⭐', bd.pos.add(vec2(Math.cos(an) * .55, .9 + Math.sin(an) * .2))]); }
+        }
+        ctx.globalAlpha = 1;
+    },
+
+    drawDrop(ctx, d)
+    {
+        const t = clamp(d.t / d.dur, 0, 1);
+        const e = t * t;
+        const y = d.from.y + (d.to.y - d.from.y) * e, x = d.from.x + (d.to.x - d.from.x) * e;
+        NX.ell(ctx, d.to.x, d.to.y - .4, .3 + .5 * t, .12 + .15 * t, 'rgba(0,0,0,.3)');
+        if (d.kind === 'box') NX.box(ctx, x, y, .9, '#d9a066', 0, d.spin * t * 3);
+        else NX.chibi(ctx, x, y, { look:d.look, vest:d.vest, mood:'shocked', angle:d.spin * t * 8, face:1 });
+    },
+
+    drawForklift(ctx, f)
+    {
+        const lp = WH_MAP.loopPos(f.s);
+        const pos = this.T(lp);
+        const h = this.T({ x:lp.dx, y:lp.dy });
+        const ang = Math.atan2(h.y, h.x);
+        const T = timeReal;
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        // blue pedestrian-warning spot
+        const g = ctx.createRadialGradient(h.x * 2.3, h.y * 2.3, 0, h.x * 2.3, h.y * 2.3, .9);
+        g.addColorStop(0, `rgba(60,140,255,${f.speed > .3 ? .6 : .25})`); g.addColorStop(1, 'rgba(60,140,255,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(h.x * 2.3, h.y * 2.3, .9, 0, 7); ctx.fill();
+        ctx.rotate(ang);
+        const bounce = f.speed > .3 ? Math.abs(Math.sin(T * 12 + f.id)) * .04 : 0;
+        NX.ell(ctx, 0, -.12, 1.15, .65, NX.SHADOW);
+        // wheels
+        for (const [wx, wy] of [[-.5, .52], [-.5, -.52], [.45, .52], [.45, -.52]]) NX.rr(ctx, wx, wy, .42, .22, .1, '#2b2d42', null, 0);
+        // forks + load
+        NX.rr(ctx, 1.05, .26, .8, .12, .05, '#c7ced9', NX.O, .05);
+        NX.rr(ctx, 1.05, -.26, .8, .12, .05, '#c7ced9', NX.O, .05);
+        if (f.load) NX.box(ctx, 1.05, 0, .72, PACKAGE_TYPES[f.load]?.color || '#d9a066', 0, -ang);
+        NX.rr(ctx, .62, 0, .16, 1.0, .06, '#3b3f55', NX.O, .06);   // mast
+        NX.rr(ctx, -.1, bounce, 1.35, 1.02, .32, '#ffc83d', NX.O, .12);  // body
+        NX.rr(ctx, -.72, bounce, .3, .96, .14, '#ff8a3d', NX.O, .08);   // counterweight
+        NX.rr(ctx, -.2, bounce, .62, .7, .22, 'rgba(255,255,255,.35)', NX.O, .07); // cab glass
+        NX.circ(ctx, -.2, bounce, .24, '#ffe0c2', NX.O, .06);            // driver
+        NX.circ(ctx, -.24, bounce, .2, '#ffd23f', NX.O, .05);            // driver's hat
+        const brake = f.braking || f.stopT > 0 || f.hold;
+        for (const sy of [-.36, .36]) NX.rr(ctx, -.86, sy, .1, .18, .04, brake ? '#ff2d2d' : '#7f1d1d', null, 0);
+        const blink = Math.sin(T * 9 + f.id) > 0;
+        NX.circ(ctx, -.45, bounce, .14, blink ? '#ffae00' : '#a14d00', NX.O, .04);
+        ctx.restore();
+        if (f.hold)
+        {
+            const w = this.sim.worker(f.hold.workerId);
+            if (w) { const wp = this.workerPos(w); NX.line(ctx, pos.x, pos.y, wp.x, wp.y, .14, `rgba(255,40,40,${.5 + .5 * Math.sin(T * 14)})`); }
+            this.iconQueue.push(['‼️', pos.add(vec2(0, 1.1))]);
+        }
+    },
+
+    drawIncident(ctx, inc)
     {
         const w = this.sim.worker(inc.workerId);
         if (!w) return;
         const T = timeReal;
-        const p = this.workerPos(w).add(vec2(0, 1.6));
+        const wp = this.workerPos(w);
         const left = clamp(1 - (this.sim.t - inc.t0) / inc.window, 0, 1);
-        const pulse = .5 + .5 * Math.sin(T * 12);
-        drawCircle(p, 2.2 + pulse * .3, new Color(1, .2, .1, .18 + pulse * .15));
-        drawCircle(p, 1.35, wmHex('#facc15'), .1, BLACK);
-        // countdown ring
-        const segs = 28, rad = .82;
-        for (let i = 0; i < segs * left; i++)
+        if (inc.type === 'falling')
         {
-            const a0 = i / segs * Math.PI * 2, a1 = (i + 1) / segs * Math.PI * 2;
-            drawLine(p.add(vec2(Math.sin(a0) * rad, Math.cos(a0) * rad)), p.add(vec2(Math.sin(a1) * rad, Math.cos(a1) * rad)), .14, left < .35 ? wmHex('#dc2626') : wmHex('#111827'));
+            // a teetering stack of boxes looms overhead, its shadow growing on the worker
+            NX.ell(ctx, wp.x, wp.y - .45, .5 + (1 - left) * .6, .18 + (1 - left) * .14, `rgba(0,0,0,${.2 + (1 - left) * .35})`);
+            const lean = Math.sin(T * 6) * (.12 + (1 - left) * .25);
+            for (let i = 0; i < 3; i++) NX.box(ctx, wp.x + Math.sin(lean) * i * .9, wp.y + 1.7 + i * .78, .8, '#d9a066', 0, lean * (i + 1) * .5);
         }
-        wmText(INCIDENT_DEFS[inc.type].icon, p, .62);
-        wmText('TAP!', p.add(vec2(0, -1.05)), .36, wmHex('#fef08a', .7 + .3 * pulse), .06, BLACK);
+        const p = wp.add(vec2(0, inc.type === 'falling' ? 3.6 : 1.7));
+        const pulse = .5 + .5 * Math.sin(T * 12);
+        NX.circ(ctx, p.x, p.y, 1.1 + pulse * .15, `rgba(255,60,40,${.25 + pulse * .2})`, null, 0);
+        NX.circ(ctx, p.x, p.y, .78, '#ffd23f', NX.O, .12);
+        NX.pie(ctx, p.x, p.y, .78, 1 - left, left < .35 ? 'rgba(255,40,40,.55)' : 'rgba(43,45,66,.25)');
+        NX.rr(ctx, p.x, p.y + .12, .16, .55, .08, NX.O, null, 0);
+        NX.circ(ctx, p.x, p.y - .34, .1, NX.O, null, 0);
+    },
+};
+
+// ===========================================================================
+// NX — chunky "toy" drawing kit (Canvas2D in world units, y up)
+// ===========================================================================
+const NX =
+{
+    O: '#2b2d42',
+    SHADOW: 'rgba(43,45,66,.28)',
+    world()
+    {
+        const ctx = mainContext;
+        const o = worldToScreen(vec2(0, 0));
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.scale(cameraScale, -cameraScale);
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        shiftView.iconQueue = [];
+        return ctx;
+    },
+    done(ctx)
+    {
+        ctx.restore();
+        for (const [icon, p] of shiftView.iconQueue) wmText(icon, p, .42);
+        shiftView.iconQueue = [];
+    },
+    mix(a, b, t)
+    {
+        const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+        const r = (pa >> 16) + ((pb >> 16) - (pa >> 16)) * t, g = ((pa >> 8) & 255) + (((pb >> 8) & 255) - ((pa >> 8) & 255)) * t, bl = (pa & 255) + ((pb & 255) - (pa & 255)) * t;
+        return `rgb(${r | 0},${g | 0},${bl | 0})`;
+    },
+    alpha(hex, a) { const p = parseInt(hex.slice(1), 16); return `rgba(${p >> 16},${(p >> 8) & 255},${p & 255},${a})`; },
+    rr(ctx, x, y, w, h, r, fill, stroke, lw)
+    {
+        r = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(x - w/2, y - h/2, w, h, r) : ctx.rect(x - w/2, y - h/2, w, h);
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke && lw) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+    },
+    circ(ctx, x, y, r, fill, stroke, lw)
+    {
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke && lw) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+    },
+    ell(ctx, x, y, rx, ry, fill, stroke, lw, rot = 0)
+    {
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke && lw) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+    },
+    line(ctx, x1, y1, x2, y2, w, color) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.strokeStyle = color; ctx.lineWidth = w; ctx.stroke(); },
+    poly(ctx, pts, fill) { ctx.beginPath(); pts.forEach((p, i)=> i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); },
+    pie(ctx, x, y, r, t, fill)
+    {
+        if (t <= 0) return;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, r, Math.PI / 2, Math.PI / 2 - t * Math.PI * 2, true); ctx.closePath();
+        ctx.fillStyle = fill; ctx.fill();
+    },
+    gear(ctx, x, y, r, a)
+    {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+        for (let i = 0; i < 6; i++) { ctx.rotate(Math.PI / 3); NX.rr(ctx, 0, r * .9, r * .45, r * .5, .05, '#ffffff', NX.O, .05); }
+        NX.circ(ctx, 0, 0, r * .8, '#ffffff', NX.O, .07);
+        NX.circ(ctx, 0, 0, r * .3, '#ff8a3d', NX.O, .05);
+        ctx.restore();
+    },
+    box(ctx, x, y, s, color, glow = 0, rot = 0)
+    {
+        ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(rot);
+        if (glow) NX.rr(ctx, 0, 0, s * 1.45, s * 1.45, s * .4, `rgba(255,220,40,${.35 * glow})`, null, 0);
+        NX.rr(ctx, 0, -s * .1, s, s, s * .18, 'rgba(0,0,0,.18)', null, 0);
+        NX.rr(ctx, 0, 0, s, s, s * .18, color, NX.O, s * .12);
+        NX.rr(ctx, 0, 0, s * .22, s * .92, 0, 'rgba(255,255,255,.45)', null, 0);
+        NX.rr(ctx, -s * .22, s * .24, s * .3, s * .1, s * .05, 'rgba(255,255,255,.4)', null, 0);
+        ctx.restore();
+    },
+    truck(ctx, x, y, long, T)
+    {
+        ctx.save(); ctx.translate(x, y); if (!long) ctx.rotate(Math.PI / 2);
+        const b = Math.sin(T * 3) * .03;
+        NX.rr(ctx, 0, .6 + b, 1.5, 2.6, .25, '#ffffff', NX.O, .1);
+        NX.rr(ctx, 0, .6 + b, 1.1, 2.1, .12, '#ff5d8f', null, 0);
+        NX.rr(ctx, 0, -1.25 + b, 1.5, 1.1, .35, '#3ec1ff', NX.O, .1);
+        NX.rr(ctx, 0, -1.45 + b, 1.1, .4, .15, '#d8f3ff', NX.O, .06);
+        ctx.restore();
+    },
+    // the star of the show: a chibi warehouse worker
+    chibi(ctx, x, y, o)
+    {
+        const look = o.look || { skin:1, hair:0, style:0, hat:0, acc:0 };
+        const skin = LOOK_SKIN[look.skin] || LOOK_SKIN[1], hair = LOOK_HAIR[look.hair] || LOOK_HAIR[0], hat = LOOK_HAT[look.hat] || LOOK_HAT[0];
+        const O = NX.O, sq = o.squash || 1, face = o.face || 1;
+        ctx.save(); ctx.translate(x, y); if (o.angle) ctx.rotate(o.angle); ctx.scale(1, sq);
+        if (!o.angle) NX.ell(ctx, 0, -.5, .45, .14, NX.SHADOW);
+        // feet
+        const st = o.step || 0;
+        NX.ell(ctx, -.17, -.44 + Math.max(0, st) * .1, .13, .09, '#3b3f55', O, .05);
+        NX.ell(ctx, .17, -.44 + Math.max(0, -st) * .1, .13, .09, '#3b3f55', O, .05);
+        // body + hi-vis
+        NX.rr(ctx, 0, -.12, .66, .62, .22, o.vest, O, .08);
+        NX.rr(ctx, 0, -.08, .62, .1, 0, '#ffe066', null, 0);
+        NX.circ(ctx, -.37, -.1 + st * .04, .1, skin, O, .05);
+        NX.circ(ctx, .37, -.1 - st * .04, .1, skin, O, .05);
+        if (o.homegrown) { NX.circ(ctx, .18 * face, .04, .08, '#7ed957', O, .03); }
+        // hair behind
+        if (look.style === 2 || look.style === 4) NX.rr(ctx, 0, .48, .9, look.style === 4 ? 1.05 : .75, .35, hair, O, .07);
+        if (look.style === 3) NX.circ(ctx, 0, .98, .17, hair, O, .06);
+        // head
+        NX.circ(ctx, 0, .5, .42, skin, O, .08);
+        NX.ell(ctx, -.25, .4, .08, .05, 'rgba(255,120,150,.6)');
+        NX.ell(ctx, .25, .4, .08, .05, 'rgba(255,120,150,.6)');
+        // eyes
+        const ex = .06 * face, mood = o.mood;
+        if (mood === 'dizzy') { for (const sx of [-.14, .14]) { NX.line(ctx, sx - .07 + ex, .5, sx + .07 + ex, .58, .05, O); NX.line(ctx, sx - .07 + ex, .58, sx + .07 + ex, .5, .05, O); } }
+        else if (o.blink || o.sleepy) { for (const sx of [-.14, .14]) NX.line(ctx, sx - .06 + ex, .52, sx + .06 + ex, .52, .05, O); }
+        else if (mood === 'happy') { for (const sx of [-.14, .14]) { ctx.beginPath(); ctx.arc(sx + ex, .5, .06, 0, Math.PI); ctx.strokeStyle = O; ctx.lineWidth = .05; ctx.stroke(); } }
+        else if (mood === 'shocked') { for (const sx of [-.14, .14]) { NX.circ(ctx, sx + ex, .53, .085, '#ffffff', O, .035); NX.circ(ctx, sx + ex, .53, .035, O); } }
+        else
+        {
+            for (const sx of [-.14, .14]) { NX.ell(ctx, sx + ex, .53, .045, .065, O); NX.circ(ctx, sx + ex + .015, .555, .017, '#ffffff'); }
+            if (mood === 'angry') { NX.line(ctx, -.22 + ex, .66, -.08 + ex, .61, .045, O); NX.line(ctx, .22 + ex, .66, .08 + ex, .61, .045, O); }
+            if (mood === 'sad') { NX.line(ctx, -.22 + ex, .61, -.08 + ex, .66, .04, O); NX.line(ctx, .22 + ex, .61, .08 + ex, .66, .04, O); NX.ell(ctx, .3, .62, .04, .07, '#7cc8ff'); }
+        }
+        // mouth
+        if (mood === 'happy') { ctx.beginPath(); ctx.arc(ex, .38, .09, Math.PI, 0); ctx.closePath(); ctx.fillStyle = '#c2410c'; ctx.fill(); ctx.strokeStyle = O; ctx.lineWidth = .035; ctx.stroke(); }
+        else if (mood === 'shocked' || mood === 'dizzy') NX.ell(ctx, ex, .34, .05, .065, '#7c2d12', O, .03);
+        else if (mood === 'sad' || mood === 'angry') { ctx.beginPath(); ctx.arc(ex, .3, .07, .2 * Math.PI, .8 * Math.PI); ctx.strokeStyle = O; ctx.lineWidth = .04; ctx.stroke(); }
+        else { ctx.beginPath(); ctx.arc(ex, .4, .06, 1.2 * Math.PI, 1.8 * Math.PI); ctx.strokeStyle = O; ctx.lineWidth = .04; ctx.stroke(); }
+        // accessories
+        if (look.acc === 1) for (const sx of [-.14, .14]) NX.circ(ctx, sx + ex, .53, .1, 'rgba(255,255,255,.2)', O, .035);
+        if (look.acc === 2) { ctx.beginPath(); ctx.arc(0, .42, .36, Math.PI * 1.05, Math.PI * 1.95); ctx.lineTo(.2, .28); ctx.lineTo(-.2, .28); ctx.closePath(); ctx.fillStyle = hair; ctx.fill(); ctx.strokeStyle = O; ctx.lineWidth = .04; ctx.stroke(); }
+        if (look.acc === 3) NX.ell(ctx, ex, .43, .12, .035, hair, O, .025);
+        if (look.acc === 4) { NX.rr(ctx, -.43, .52, .1, .22, .05, '#ff4d4d', O, .03); NX.rr(ctx, .43, .52, .1, .22, .05, '#ff4d4d', O, .03); }
+        // hard hat
+        ctx.beginPath(); ctx.arc(0, .66, .38, 0, Math.PI); ctx.closePath(); ctx.fillStyle = hat; ctx.fill(); ctx.strokeStyle = O; ctx.lineWidth = .07; ctx.stroke();
+        NX.rr(ctx, 0, .67, .9, .1, .05, hat, O, .06);
+        ctx.beginPath(); ctx.arc(-.08, .74, .22, Math.PI * .6, Math.PI * .9); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = .06; ctx.stroke();
+        if (look.acc === 5) NX.rr(ctx, 0, .7, .78, .08, .03, '#e11d48', null, 0);
+        ctx.restore();
     },
 };

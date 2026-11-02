@@ -81,6 +81,8 @@ class ShiftSim
         this.lastHour = 0;
         this.aiTimer = 1;
         this.riskMult = crewRisk().mult;
+        this.homegrownBond = hasHomegrownBond(c.lineup);
+        this.modSpeed = modMul('speed'); this.modRisk = modMul('risk'); this.modRevenue = modMul('revenue');
     }
 
     on(fn) { this.listeners.push(fn); }
@@ -132,7 +134,7 @@ class ShiftSim
         sp *= moraleF;
         sp *= traitMod(s, 'speed');
         sp *= 1 + this.fac.scanners * .04 + this.fac.conveyors * .03;
-        sp *= LINE_SPEEDS[this.lineSpeed].speed;
+        sp *= LINE_SPEEDS[this.lineSpeed].speed * this.modSpeed * (this.homegrownBond ? 1.04 : 1);
         sp *= 1 + (this.stats.flow - 1) * .04;
         // teammates' aura
         let aura = 0;
@@ -162,6 +164,7 @@ class ShiftSim
         if (def.cert && def.cert !== 'maintenance' && !s.certs.includes(def.cert)) h *= def.cert === 'hazmat' ? 2.5 : 1.5;
         if (w.pkg && PACKAGE_TYPES[w.pkg.type].heavy) h *= 1.5 - s.attrs.strength/40;
         if (this.simulated) h *= 1.25;
+        h *= this.modRisk * (this.homegrownBond ? .9 : 1);
         return h;
     }
 
@@ -673,7 +676,17 @@ class ShiftSim
                 let days = wmRI(row[1], row[2]);
                 if (firstAider) days = Math.max(1, Math.round(days * .75));
                 const fine = serious ? Math.round((1500 + Math.random()*4500) * (1 - this.fac.safety * .1) / 100) * 100 : 0;
-                const inj = { id:s.id, name:s.name, label:row[0], days, serious, fine, cause:d.label, zone:w.zone };
+                const inj = { id:s.id, name:s.name, label:row[0], days, serious, fine, cause:d.label, zone:w.zone, type:inc.type };
+                // the worst case: a fatality
+                if (serious && Math.random() < .1 * d.sevMul * (1 - this.fac.safety * .12) * (firstAider ? .5 : 1))
+                {
+                    inj.fatal = true;
+                    inj.label = 'Fatal accident';
+                    inj.days = 999;
+                    inj.cause = inc.type === 'falling' ? FATAL_CAUSES[0] : (inc.type === 'strike' || inc.type === 'forklift') ? FATAL_CAUSES[1]
+                        : inc.type === 'chemical' ? FATAL_CAUSES[4] : inc.type === 'electrical' ? 'electrocuted by an exposed panel' : wmPick(FATAL_CAUSES);
+                    this.zones[w.at] && (this.zones[w.at].pausedUntil = this.t + 40);
+                }
                 this.stats.injuries.push(inj);
                 w.injured = true;
                 if (w.crossing) { this.cwUsers[w.crossing.id]--; w.crossing = null; }
@@ -796,7 +809,7 @@ class ShiftSim
         for (const w of this.workers) if (w.pkg && !w.pkg.isReturn) backlog++;
         const avgFlow = st.flowTimeSum / Math.max(1, this.t);
         const units = st.shipped * UNITS_PER_PARCEL;
-        const revenue = Math.round(units * t.rate * (1 + (avgFlow - 1) * .03));
+        const revenue = Math.round(units * t.rate * (1 + (avgFlow - 1) * .03) * this.modRevenue);
         const penalties = st.lateRush * 25 + st.defects * 12 + st.damaged * 15 + backlog * 2;
         const fines = st.injuries.reduce((a, i)=> a + i.fine, 0);
         const energyCost = 180 + c.tier * 60 + this.overtimeHours * 40;

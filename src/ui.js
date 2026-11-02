@@ -81,11 +81,12 @@ function showTitle()
     const cont = hasSave();
     $('#screen').innerHTML = `
     <div class="title">
-        <div class="logo"><span>📦</span><h1>WAREHOUSE<br>MANAGER</h1><p>Run the floor. Build the crew. Beat the rivals.</p></div>
+        <div class="logo"><span>📦</span><h1>WAREHOUSE<br>MANAGER</h1><p>Run the floor. Raise your crew. Build an empire.</p></div>
         <div class="card titleCard">
             ${cont ? `<button class="big primary" data-act="continue">▶ Continue Career</button><div class="sep">or start again</div>` : ''}
             <label>Manager name<input id="inName" maxlength="24" value="Alex Morgan"></label>
             <label>Company name<input id="inCo" maxlength="28" value="Northbridge Logistics"></label>
+            ${titleExtrasHtml()}
             <button class="big ${cont ? '' : 'primary'}" data-act="newCareer">✚ New Career</button>
             <div class="zonesStrip">${ZONE_KEYS.map(z => `<span style="background:${ZONE_DEFS[z].hex}" title="${ZONE_DEFS[z].name}">${ZONE_DEFS[z].icon}</span>`).join('')}</div>
             <p class="small muted">Tip: tap warnings during a shift to prevent accidents. Drag staff between coloured zones to clear bottlenecks.</p>
@@ -106,17 +107,19 @@ function showHub(tab)
     const t = tierDef();
     const tabs = [
         ['overview','🏠','Overview'], ['staff','👷','Staff'], ['training','🎓','Training'], ['transfers','🤝','Transfers'],
-        ['facilities','🏗️','Facilities'], ['league','🏆','League'], ['finances','💰','Finances'], ['inbox','✉️','Inbox'],
+        ['academy','🌱','Academy'], ['facilities','🏗️','Facilities'], ['league','🏆','League'], ['finances','💰','Finances'], ['career','💼','Career'], ['inbox','✉️','Inbox'],
     ];
     const unread = unreadCount();
     const pend = pendingDecisions().length;
     $('#screen').innerHTML = `
     <div class="hub">
         <header class="top">
-            <div class="co"><b>${esc(c.company)}</b><span>${t.name} · Season ${c.season} · Week ${Math.min(c.week, SEASON_WEEKS)}/${SEASON_WEEKS} · ${wmDayName(c.day)}${isPeakWeek() ? ' · <em class="peak">PEAK</em>' : ''}</span></div>
+            ${safetyBoardHtml(c.records.daysSinceAccident, c.records.bestSafeRun, true)}
+            <div class="co"><b style="color:${c.companyHex}">${esc(c.company)}</b><span>${t.name} · Season ${c.season} · Week ${Math.min(c.week, SEASON_WEEKS)}/${SEASON_WEEKS} · ${wmDayName(c.day)}${isPeakWeek() ? ' · <em class="peak">PEAK</em>' : ''}</span></div>
             <div class="kpis">
                 <div class="kpi"><small>Cash</small><b class="${c.cash < 0 ? 'neg' : ''}">${wmMoney(c.cash)}</b></div>
-                <div class="kpi"><small>Board</small><b>${c.board.confidence}%</b><i class="bar"><i style="width:${c.board.confidence}%;background:${c.board.confidence > 55 ? '#22c55e' : c.board.confidence > 30 ? '#facc15' : '#ef4444'}"></i></i></div>
+                ${c.manager.owner ? `<div class="kpi"><small>Owner</small><b>👑</b></div>` : `<div class="kpi"><small>Board</small><b>${c.board.confidence}%</b><i class="bar"><i style="width:${c.board.confidence}%;background:${c.board.confidence > 55 ? '#22c55e' : c.board.confidence > 30 ? '#facc15' : '#ef4444'}"></i></i></div>`}
+                <div class="kpi"><small>Rep</small><b>${c.manager.rep}</b></div>
                 <div class="kpi"><small>League</small><b>${ordinal(leaguePosition())}</b></div>
             </div>
             <button class="go" data-act="preshift">Next Shift ▶</button>
@@ -137,6 +140,8 @@ function renderTab(tab)
         case 'league': return renderLeague();
         case 'finances': return renderFinances();
         case 'inbox': return renderInbox();
+        case 'academy': return renderAcademy();
+        case 'career': return renderCareer();
     }
     return '';
 }
@@ -162,6 +167,7 @@ function renderOverview()
                 <div><small>Crew risk</small><b class="risk r${risk.level}">${risk.label}</b><span>safety ${risk.avgSafety.toFixed(1)} · morale ${Math.round(risk.avgMorale)}</span></div>
             </div>
             ${f.notes.length ? `<div class="notes">${f.notes.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
+            ${modsHtml()}
             <div class="btnrow"><button class="primary" data-act="preshift">Pre-shift briefing ▶</button></div>
         </section>
         ${pend.length ? `<section class="card warnCard"><h3>⚖️ Decisions waiting (${pend.length})</h3>${pend.slice(0, 3).map(renderMsg).join('')}</section>` : ''}
@@ -191,6 +197,13 @@ function renderOverview()
         ${news.length ? `<section class="card"><h3>📰 Around the league</h3>${news.map(m => `<p class="small"><b>${esc(m.title)}</b><br>${esc(m.body)}</p>`).join('')}</section>` : ''}
     </div>`;
 }
+function modsHtml()
+{
+    const mods = career.mods || [];
+    const bond = hasHomegrownBond(career.lineup);
+    if (!mods.length && !bond) return '';
+    return `<div class="notes mods">${bond ? '<span class="good">🤝 Homegrown Bond: +4% speed, −10% risk</span>' : ''}${mods.map(m => `<span class="${(m.key === 'risk' ? m.value < 1 : m.value > 1) ? 'good' : 'bad'}">${esc(m.label)} · ${m.shifts} left</span>`).join('')}</div>`;
+}
 function avgMorale() { return career.staff.reduce((a,s)=> a + s.morale, 0) / Math.max(1, career.staff.length); }
 
 function staffRow(s, opts = {})
@@ -200,7 +213,7 @@ function staffRow(s, opts = {})
     const lz = career.lineup[s.id];
     const status = s.injury ? `<span class="tag bad">🚑 ${s.injury.days}d</span>` : s.course ? `<span class="tag">🎓 ${CERT_DEFS[s.course.cert].short}</span>` : '';
     return `<button class="srow" data-act="staff" data-id="${s.id}">
-        <span class="nm"><b>${esc(s.name)}</b><small>${s.age} · ${s.traits.join(', ')}</small></span>
+        <span class="nm withAva">${staffAva(s, 40)}<span><b>${esc(displayName(s))}</b><small>${s.age} · ${s.traits.join(', ')}</small></span></span>
         <span class="bz">${zonePill(bz)} ${starsHtml(r)}</span>
         <span class="cell">${moraleDot(s.morale)}<small>${Math.round(s.condition)}%</small></span>
         <span class="cell"><small>Form</small>${formAvg(s)}</span>
@@ -247,7 +260,7 @@ function marketRow(s)
     const r = known ? zoneRating(s, bz) : zoneRating({ ...s, attrs: Object.fromEntries(ATTR_KEYS.map(k => [k, attrView(s, k).v])) }, bz);
     const fee = transferFee(s);
     return `<button class="srow" data-act="market" data-id="${s.id}">
-        <span class="nm"><b>${esc(s.name)}</b><small>${s.age} · ${known ? s.traits.join(', ') : 'Unscouted'}</small></span>
+        <span class="nm withAva">${staffAva(s, 40)}<span><b>${esc(s.name)}</b><small>${s.age} · ${known ? s.traits.join(', ') : 'Unscouted'}</small></span></span>
         <span class="bz">${zonePill(bz)} ${starsHtml(r, !known)}</span>
         <span class="cell"><small>Wants</small>${wmMoney(Math.round(contractDemand(s) * (s.employer ? 1.12 : 1) / 10) * 10)}/wk</span>
         <span class="cell"><small>${fee ? 'Fee' : 'Free'}</small>${fee ? wmMoney(fee) : '—'}</span>
@@ -364,6 +377,7 @@ function staffDetail(s, market = false)
         const demand = contractDemand(s);
         actions = `
         <div class="btnrow wrap">
+            <button data-act="customise" data-id="${s.id}">🎨 Customise</button>
             <button data-act="talk" data-id="${s.id}" data-k="praise">👍 Praise</button>
             <button data-act="talk" data-id="${s.id}" data-k="criticise">👎 Criticise</button>
             <button data-act="contractDlg" data-id="${s.id}">📝 New contract (wants ~${wmMoney(demand)})</button>
@@ -380,7 +394,8 @@ function staffDetail(s, market = false)
     openModal(`
         <div class="sd">
             <div class="sdh">
-                <div><h2>${esc(s.name)}</h2><p>${s.age} yrs · ${s.employer ? esc(s.employer) : own ? esc(career.company) : 'Free agent'} · value ${wmMoney(staffValue(s))}</p>
+                <div class="sdAva">${staffAva(s, 96, 'happy')}</div>
+                <div><h2>${esc(displayName(s))}</h2>${s.homegrown ? `<p class="pos">🌱 Academy graduate · class of S${s.homegrown.season}${s.archetype ? ' · ' + ARCHETYPES[s.archetype].label : ''}</p>` : ''}<p>${s.age} yrs · ${s.employer ? esc(s.employer) : own ? esc(career.company) : 'Free agent'} · value ${wmMoney(staffValue(s))}</p>
                 <p>${(own || s.scouted) ? s.traits.map(t => `<span class="trait ${TRAIT_DEFS[t].good ? 'g' : 'b'}" title="${esc(TRAIT_DEFS[t].desc)}">${t}</span>`).join('') : '<span class="trait">Personality unknown</span>'}
                    ${s.certs.map(c => `<span class="cert" title="${CERT_DEFS[c].label}">${CERT_DEFS[c].label}</span>`).join('')}</p></div>
                 <div class="sdk">
@@ -479,6 +494,7 @@ function showPreshift()
                 </div>
                 ${f.notes.length ? `<div class="notes">${f.notes.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
                 ${rivalLine ? `<p class="small muted">📰 ${esc(rivalLine.title)}</p>` : ''}
+                ${modsHtml()}
                 <div class="seg" title="Line speed">${Object.entries(LINE_SPEEDS).map(([k, d]) => `<button class="${c.defaultLineSpeed === k ? 'on' : ''}" data-act="lineDefault" data-k="${k}">${d.label}</button>`).join('')}</div>
                 <p class="tiny muted">Careful: −15% speed, −45% risk, staff wait patiently at crossings · Push: +18% speed, +80% risk, faster forklifts, impatient staff</p>
                 <p class="tiny muted">🚜 ${4 + c.tier} forklifts patrol the roads (more when trucks dock). Staff cross at zebra crossings — impatient ones (low Safety/Concentration, Speed Demons, Accident-Prone) jaywalk.</p>
@@ -491,7 +507,7 @@ function showPreshift()
                 {
                     const z = c.lineup[s.id] || 'bench';
                     return `<div class="lrow" style="--zc:${z === 'bench' ? '#64748b' : ZONE_DEFS[z].hex}">
-                        <button class="nm linkish" data-act="staff" data-id="${s.id}"><b>${esc(s.name)}</b><small>${moraleDot(s.morale)} ${Math.round(s.condition)}% · ${s.certs.map(x => CERT_DEFS[x].short).join(' ')}</small></button>
+                        <button class="nm linkish withAva" data-act="staff" data-id="${s.id}">${staffAva(s, 34)}<b>${esc(displayName(s))}</b><small>${moraleDot(s.morale)} ${Math.round(s.condition)}% · ${s.certs.map(x => CERT_DEFS[x].short).join(' ')}</small></button>
                         <span>${z !== 'bench' ? starsHtml(zoneRating(s, z)) : ''}</span>
                         <select data-lineup="${s.id}">${[...ZONE_KEYS, 'bench'].map(k => `<option value="${k}" ${k === z ? 'selected' : ''}>${k === 'bench' ? '☕ Break room' : ZONE_DEFS[k].icon + ' ' + ZONE_DEFS[k].name + ' ' + '★'.repeat(Math.round(starsFor(zoneRating(s, k))))}</option>`).join('')}</select>
                     </div>`;
@@ -526,18 +542,22 @@ function trySimulate()
 // ---------------------------------------------------------------------------
 // Shift lifecycle
 let wmSim = null;
-function startShift()
+function startShift(skipStory = false)
 {
     closeModal();
+    const sid = !skipStory && storyNext('preShift');
+    if (sid) return playStory(sid, ()=> startShift(true));
     wmSim = new ShiftSim(career, { simulated:false });
     setMode('shift');
     buildHud();
     shiftView.start(wmSim);
     hudToast(`Shift started — target ${fmtUnits(wmSim.forecast.target)} units. Drag workers to rebalance!`, '#38bdf8');
 }
-function simulateShift()
+function simulateShift(skipStory = false)
 {
     closeModal();
+    const sid = !skipStory && storyNext('preShift');
+    if (sid) return playStory(sid, ()=> simulateShift(true));
     wmSim = new ShiftSim(career, { simulated:true });
     wmSim.runToEnd();
     finishShift();
@@ -555,21 +575,37 @@ function finishShift()
     const week = applyShiftResult(res);
     wmSim = null;
     saveCareer();
-    wmPendingFlow = [];
+    wmPendingFlow = [{ kind:'story', point:'postShift' }];
     for (const m of career.pendingMilestones) wmPendingFlow.push({ kind:'cine', m });
     career.pendingMilestones = [];
     if (week) wmPendingFlow.push({ kind:'week', week });
-    if (week?.seasonEnd) wmPendingFlow.push({ kind:'season', season:week.seasonEnd });
+    if (week?.seasonEnd)
+    {
+        const se = week.seasonEnd;
+        wmPendingFlow.push({ kind:'season', season:se });
+        if (!se.sacked)
+        {
+            wmPendingFlow.push({ kind:'story', point:'seasonEnd', ctx:se }, { kind:'story', point:'seasonEnd', ctx:se });
+            if (se.offers?.length) wmPendingFlow.push({ kind:'offers', reason:'season' });
+        }
+    }
     showReport(res);
 }
 function continueFlow()
 {
     closeModal();
     const step = wmPendingFlow.shift();
-    if (!step) { saveCareer(); return showHub('overview'); }
+    if (!step) { saveCareer(); return career.board.sacked ? showGameOver() : showHub('overview'); }
     if (step.kind === 'cine') return showCinematic(step.m);
     if (step.kind === 'week') return showWeekSummary(step.week);
     if (step.kind === 'season') return showSeasonEnd(step.season);
+    if (step.kind === 'story')
+    {
+        const id = storyNext(step.point, step.ctx);
+        if (!id) return continueFlow();
+        return playStory(id, ()=> continueFlow(), step.ctx);
+    }
+    if (step.kind === 'offers') return showOffersModal(step.reason);
 }
 
 // ---------------------------------------------------------------------------
@@ -577,6 +613,7 @@ function continueFlow()
 function buildHud()
 {
     $('#hud').innerHTML = `
+    ${safetyBoardHtml(career.records.daysSinceAccident, career.records.bestSafeRun)}
     <div class="hudTop">
         <div class="clock"><b id="hClock">06:00</b><i class="bar"><i id="hProg"></i></i></div>
         <div class="chip"><small>Shipped</small><b id="hShip">0</b><span id="hTgt"></span></div>
@@ -705,7 +742,7 @@ function showReport(res, replay = false)
                     <div><small>Near misses</small><b>${r.nearMisses}</b></div>
                     <div><small>Injuries</small><b class="${r.injuries.length ? 'neg' : 'pos'}">${r.injuries.length}</b></div>
                 </div>
-                ${r.injuries.map(i => `<p class="small ${i.serious ? 'neg' : 'warn'}">${i.serious ? '🚨' : '🩹'} ${esc(i.name)} — ${esc(i.label)} (${esc(i.cause)}, ${ZONE_DEFS[i.zone].name}) · out ${i.days} shift${i.days > 1 ? 's' : ''}${i.fine ? ` · fine ${wmMoney(i.fine)}` : ''}</p>`).join('') || '<p class="pos small">🛡️ No injuries this shift.</p>'}
+                ${r.injuries.map(i => `<p class="small ${i.serious ? 'neg' : 'warn'}">${i.fatal ? '🕯️ <b>FATAL</b>' : i.serious ? '🚨' : '🩹'} ${esc(i.name)} — ${esc(i.label)} (${esc(i.cause)}${ZONE_DEFS[i.zone] ? ', ' + ZONE_DEFS[i.zone].name : ''})${i.fatal ? '' : ` · out ${i.days} shift${i.days > 1 ? 's' : ''}`}${i.fine ? ` · fine ${wmMoney(i.fine)}` : ''}</p>`).join('') || '<p class="pos small">🛡️ No injuries this shift.</p>'}
                 <p class="small">🚜 Road crossings ${r.crossings} · waited ${Math.round(r.crossWait)} min for forklifts · <span class="${r.jaywalks ? 'neg' : 'pos'}">🏃 jaywalks ${r.jaywalks}</span>${r.forkliftBrakes ? ` · emergency brakings ${r.forkliftBrakes}` : ''}</p>
                 <p class="small muted">Breakdowns ${r.breakdowns} · Bottlenecks ${r.bottlenecks} · Errors caught by QA ${r.caught} · Defects shipped ${r.defects} · Damaged ${r.damaged} · Rush orders late ${r.lateRush} of ${r.rushShipped}</p>
             </section>
@@ -789,14 +826,20 @@ function showSeasonEnd(s)
 
 function showGameOver(s)
 {
-    setMode('gameover');
     closeModal();
+    if (!career.flags.bankrupt && !career.flags.offeredAfterSack)
+    {
+        career.flags.offeredAfterSack = true;
+        generateOffers('sacked');
+        if (career.offers.length) { setMode('gameover'); $('#screen').innerHTML = ''; return showOffersModal('sacked'); }
+    }
+    setMode('gameover');
     $('#screen').innerHTML = `
     <div class="title">
-        <div class="logo"><span>📉</span><h1>SACKED</h1><p>The board of ${esc(career.company)} has relieved you of your duties.</p></div>
+        <div class="logo"><span>${career.flags.bankrupt ? '🏦' : '📉'}</span><h1>${career.flags.bankrupt ? 'BANKRUPT' : 'SACKED'}</h1><p>${career.flags.bankrupt ? `The bank has foreclosed on ${esc(career.company)}.` : `The board of ${esc(career.company)} has relieved you of your duties.`}</p></div>
         <div class="card titleCard">
             <p>Season ${career.season}, week ${Math.min(career.week, SEASON_WEEKS)} · Board confidence ${career.board.confidence}%</p>
-            <p>Career totals: ${career.records.totalUnits.toLocaleString()} units over ${career.records.shiftsPlayed} shifts.</p>
+            <p>Career totals: ${career.records.totalUnits.toLocaleString()} units over ${career.records.shiftsPlayed} shifts · ${career.manager.trophies.length} trophies · ${career.records.fatalities} fatalities.</p>
             <button class="big primary" data-act="restart">Start a new career</button>
         </div>
     </div>`;
@@ -863,8 +906,8 @@ function onUiClick(e)
         case 'newCareer':
         {
             const n = $('#inName').value.trim(), co = $('#inCo').value.trim();
-            newCareer(n, co); saveCareer(); showHub('overview');
-            hudToast(`Welcome, ${n || 'Manager'}! Check your inbox and plan the first shift.`, '#38bdf8');
+            newCareer(n, co, wmTitleLook, wmTitleHex); saveCareer(); showHub('overview');
+            playStory('intro', ()=> { saveCareer(); showHub('overview'); hudToast(`Welcome, ${n || 'Manager'}! Plan your first shift.`, '#38bdf8'); });
             break;
         }
         case 'continue': if (loadCareer()) showHub('overview'); break;
@@ -960,6 +1003,7 @@ function onUiClick(e)
         case 'deselect': shiftView.select(null); break;
         case 'wBreak': wmSim.moveWorker(id, 'bench'); playSfx('drop'); hudWorkerCard(wmSim.worker(id)); break;
         case 'wBest': { const w = wmSim.worker(id); if (w) { wmSim.moveWorker(id, bestZone(w.s)); playSfx('drop'); hudWorkerCard(w); } break; }
+        default: if (WM_ACTIONS[act]) WM_ACTIONS[act](a, e);
     }
 }
 function onUiChange(e)
@@ -976,7 +1020,7 @@ function onUiChange(e)
         if (err) { hudToast(err, '#ef4444'); t.value = ''; } else { hudToast(`${s.name} enrolled on ${CERT_DEFS[t.value].label}`, '#22c55e'); saveCareer(); showHub('training'); }
     }
 }
-function onUiInput(e) { if (e.target.id === 'wageIn') updateChance(); }
+function onUiInput(e) { if (e.target.id === 'wageIn') updateChance(); if (WM_CHANGE[e.target.id]) WM_CHANGE[e.target.id](e.target); }
 function onUiKey(e)
 {
     if (wmMode !== 'shift' || !wmSim) return;

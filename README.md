@@ -2,7 +2,7 @@
 
 A deep logistics management sim with a real-time shift you play like Dinner Dash. You run a warehouse against rival companies: Football Manager-style staff, contracts, training, transfers, facilities, finances and board pressure, plus a hands-on shift where you move workers between coloured zones and stop accidents before they happen.
 
-Built on the [LittleJS](https://github.com/KilledByAPixel/LittleJS) engine (vendored in `dist/`). No build step needed to play.
+Bright, chunky, toy-like visuals (Canvas2D in a world transform: rounded outlined shapes, chibi workers with moods, toy forklifts). Built on the [LittleJS](https://github.com/KilledByAPixel/LittleJS) engine (vendored in `dist/`). No build step needed to play.
 
 ## Play
 
@@ -49,6 +49,27 @@ Smooth hand-offs build a **Flow multiplier** (up to ×2.0) for faster work and b
 
 **Simulate** runs the same model with your assistant in charge. If your crew is weak, tired or demoralised, the assistant advises against it: they catch fewer warnings than you and accident rates rise.
 
+## Danger
+
+Accidents are brutal. Teetering box stacks crush people, forklifts send jaywalkers flying, and serious incidents can be **fatal**. A fatality freezes the floor, removes the worker for good, and brings a $20k–50k fine. The crew is devastated, the board loses faith, your reputation takes a hit, and their name goes on the **Memorial wall**. A **DAYS WITHOUT AN ACCIDENT** board sits on the shift HUD and the hub header. It flips back to 00 the moment someone gets hurt.
+
+## Your career: excel, move up, or go it alone
+
+- **Manager profile** (Career tab): reputation, a personal wallet (weekly salary plus bonuses for promotions and titles), a trophy cabinet and your career history.
+- **Job offers**: a strong reputation brings offers at the end of each season from bigger companies (6 warehouse tiers, up to a *Global Mega-Port*). Accept one and you pick which loyal or homegrown staff **follow you**. If you get sacked, a head-hunter may still find you a lower-tier job.
+- **Found your own warehouse**: save $60,000 and you can start your own company with your name and colours, plus your followers. No board can sack you, but the bank will foreclose if you go too far into the red. Profits pay you dividends.
+
+## Homegrown academy
+
+- **Create recruits** (Academy tab): choose a first name, surname, nickname, age, archetype (Speedster, Safety Guardian, Powerhouse, Brainbox, Future Captain) and their whole look (skin, hair, style, hard hat, glasses, beard, headphones…).
+- Homegrown staff develop **35% faster**, have hidden potential that grows with your Training Centre, follow you between jobs, and earn reputation as they hit 3★, 4★ and 5★. Legends enter the **Hall of Fame**.
+- **Homegrown Bond**: when half the floor came through your academy, you get +4% speed and −10% accident risk.
+- You can **customise** any staff member (look and nickname). Nicknames appear above their heads on the floor.
+
+## Story & choices
+
+Cutscenes with characters and branching choices change the game: cash, morale, board confidence, reputation, wages, facilities and temporary modifiers to speed, risk, volume and revenue. Examples include the outgoing manager's handover, a board promise you must keep, a surprise safety inspection (come clean, cover up, or invest), a union drive that can turn into a strike, a big-client peak contract, rival press taunts, a viral jaywalking video, the Chair's useless nephew, a cover-up scandal coming back to haunt you, peak-season pep talks, promotion parties, the banker who suggests going solo, and a tragedy scene after a fatality.
+
 ## Management (between shifts)
 
 - **Staff**: 10 attributes on a 1–20 scale (Productivity, Accuracy, Safety Awareness, Stamina, Strength, Teamwork, Leadership, Adaptability, Work Rate, Concentration). Each worker also has hidden potential, consistency and injury-proneness, personality traits (Professional, Lazy, Accident-Prone, Mentor, Clumsy, Disruptive…), certifications, morale, condition and form ratings. Praise or criticise staff, renew contracts, or release them.
@@ -64,6 +85,9 @@ Smooth hand-offs build a **Flow multiplier** (up to ×2.0) for faster work and b
 |---|---|
 | `src/data.js` | All content as data: zones, traits, certs, incidents, facilities, tiers, rivals |
 | `src/warehouseMap.js` | Physical floor map: buildings, forklift roads, walkways, zebra crossings, walking graph |
+| `src/legacy.js` | Manager career, job offers, own company, homegrown academy, fatalities, story modifiers |
+| `src/story.js` | Cutscene engine, cast, scenes and choices, SVG chibi portraits |
+| `src/uiLegacy.js` | Academy creator, customiser, career screen, offers, safety board |
 | `src/model.js` | Career rules: staff generation, lineup, contracts, training, transfers, league, board, save/load |
 | `src/shiftSim.js` | `ShiftSim`, the shift engine, shared by live play and full simulation, plus the assistant AI |
 | `src/floor.js` | LittleJS rendering of the floor, drag-to-assign input, stat bubbles, particles, ZzFX sounds |

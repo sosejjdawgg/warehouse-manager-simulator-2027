@@ -175,6 +175,8 @@ const TIER_DEFS =
     { name:'Sort Centre',             volume:470, rate:.70, budget:55000,  boardVol:375, squad:17 },
     { name:'Fulfilment Centre',       volume:550, rate:.75, budget:90000,  boardVol:440, squad:20 },
     { name:'National Mega Hub',       volume:650, rate:.80, budget:150000, boardVol:525, squad:24 },
+    { name:'Continental Gateway',     volume:740, rate:.86, budget:240000, boardVol:600, squad:28 },
+    { name:'Global Mega-Port',        volume:840, rate:.94, budget:380000, boardVol:690, squad:32 },
 ];
 
 // Rival companies (fictional) — strength 0..100, archetype flavour
@@ -208,4 +210,46 @@ const MILESTONE_DEFS =
     promotion:    { title:'Staff Promotion',       icon:'⭐' },
     upgrade:      { title:'New Equipment Unveiled',icon:'🛠️' },
     league1:      { title:'Top of the League',     icon:'👑' },
+    homegrownDebut:{ title:'Academy Debut',        icon:'🌱' },
+    homegrownHero:{ title:'Homegrown Hero',        icon:'🌟' },
+    homegrownBond:{ title:'Homegrown Bond',        icon:'🤝' },
+    safe10:       { title:'10 Days Without Accident', icon:'⛑️' },
+    safe30:       { title:'30 Days Without Accident', icon:'🏅' },
+    newJob:       { title:'New Job, New Challenge', icon:'💼' },
+    ownCompany:   { title:'Your Own Warehouse!',   icon:'🏗️' },
+    empire:       { title:'Logistics Empire',      icon:'🌍' },
 };
+
+// ---------------------------------------------------------------------------
+// Appearance (used by the chibi renderer and SVG portraits)
+const LOOK_SKIN  = ['#ffe0c2','#f5c6a0','#e0a878','#c68a5a','#9c6440','#6e4529'];
+const LOOK_HAIR  = ['#2b2118','#5a3a22','#a0522d','#e8b04a','#f2e3b3','#d94b4b','#4b6bd9','#8e8e8e'];
+const LOOK_HAT   = ['#ffd23f','#ff7b39','#3ec1ff','#7ed957','#ff5d8f','#ffffff','#b07cff','#2e2e3a'];
+const LOOK_STYLES = ['Buzz','Spiky','Bob','Bun','Long','Bald'];
+const LOOK_ACCS   = ['None','Glasses','Beard','Moustache','Headphones','Bandana'];
+function randomLook()
+{
+    const r = (n)=> Math.floor(Math.random() * n);
+    return { skin:r(LOOK_SKIN.length), hair:r(LOOK_HAIR.length - 2), style:r(LOOK_STYLES.length), hat:r(LOOK_HAT.length), acc: Math.random() < .55 ? 0 : 1 + r(LOOK_ACCS.length - 1) };
+}
+
+// Academy archetypes for homegrown recruits
+const ARCHETYPES =
+{
+    speedster: { label:'Speedster',    icon:'⚡', desc:'Quick hands, quick feet.',          bias:{ productivity:3, workRate:3, stamina:2 }, zone:'yellow' },
+    guardian:  { label:'Safety Guardian', icon:'🦺', desc:'Eyes everywhere. Never jaywalks.', bias:{ safety:4, concentration:3 }, zone:'red', trait:'Steady' },
+    powerhouse:{ label:'Powerhouse',   icon:'💪', desc:'Lifts pallets like pillows.',        bias:{ strength:4, stamina:3 }, zone:'green' },
+    brain:     { label:'Brainbox',     icon:'🧠', desc:'Zero mis-picks. Spots every fault.', bias:{ accuracy:4, concentration:2, adaptability:2 }, zone:'orange' },
+    captain:   { label:'Future Captain', icon:'🎖️', desc:'Born leader, lifts the whole crew.', bias:{ leadership:4, teamwork:3 }, zone:'blue', trait:'Team Player' },
+};
+
+// Companies that might head-hunt you
+const OFFER_COMPANIES =
+[
+    { name:'Atlas Global Freight', hex:'#2563eb' }, { name:'Polar Express Logistics', hex:'#0891b2' },
+    { name:'Sunrise Cargo Co.', hex:'#f97316' }, { name:'Titan Fulfilment', hex:'#7c3aed' },
+    { name:'Harbourline Distribution', hex:'#0d9488' }, { name:'Crown Parcel Group', hex:'#ca8a04' },
+    { name:'Nimbus Supply Chain', hex:'#64748b' }, { name:'Redwood Logistics', hex:'#b91c1c' },
+];
+
+const FATAL_CAUSES = ['crushed by a falling pallet', 'struck by a reversing forklift', 'caught in a conveyor', 'fell from the racking', 'exposed to a chemical leak'];

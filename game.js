@@ -10,7 +10,9 @@
 
 'use strict';
 setDebugWatermark(false);
-setCanvasClearColor(new Color(.043, .059, .09));
+setGLEnable(false);   // everything is Canvas2D: rounded, outlined, toy-like shapes
+setCanvasClearColor(new Color(.55, .82, .48)); // grass around the warehouse
+setFontDefault('Fredoka, "Baloo 2", "Trebuchet MS", system-ui, sans-serif');
 
 ///////////////////////////////////////////////////////////////////////////////
 function gameInit()
@@ -37,24 +39,24 @@ function gameUpdatePost() {}
 function gameRender()
 {
     if (wmMode === 'shift') { shiftView.render(); return; }
-    // backdrop: conveyor lanes carrying parcels through the colour zones
+    // backdrop: a sunny, bouncy parade of parcels on conveyor belts
+    const ctx = NX.world();
     const lanes = 7;
     for (let i = 0; i < lanes; i++)
     {
-        const y = (i - (lanes - 1) / 2) * 3.6;
+        const y = (i - (lanes - 1) / 2) * 3.8;
         const dir = i % 2 ? -1 : 1;
-        drawRect(vec2(0, y), vec2(60, 1.1), new Color(.12, .15, .2));
-        const z = ZONE_KEYS[i % ZONE_KEYS.length];
-        drawRect(vec2(0, y - .7), vec2(60, .12), WM_ZONE_COLORS[z].withAlpha(.5));
-        const speed = 1.2 + (i % 3) * .5;
+        NX.rr(ctx, 0, y - .2, 64, 1.3, .6, NX.SHADOW, null, 0);
+        NX.rr(ctx, 0, y, 64, 1.3, .6, '#b6c2d6', NX.O, .12);
+        const speed = 1.4 + (i % 3) * .5;
         for (let k = 0; k < 14; k++)
         {
-            const x = ((k * 4.3 + timeReal * speed * dir + i * 1.7) % 60 + 60) % 60 - 30;
+            const x = ((k * 4.6 + timeReal * speed * dir + i * 1.7) % 64 + 64) % 64 - 32;
             const t = Object.keys(PACKAGE_TYPES)[(k + i) % 5];
-            drawRect(vec2(x, y + .15), vec2(.9, .8), WM_PKG_COLORS[t].withAlpha(.75));
-            drawRect(vec2(x, y + .2), vec2(.9, .1), new Color(0, 0, 0, .2));
+            NX.box(ctx, x, y + .75 + Math.abs(Math.sin(timeReal * 4 + k + i)) * .12, .95, PACKAGE_TYPES[t].color);
         }
     }
+    NX.done(ctx);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

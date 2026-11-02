@@ -113,6 +113,7 @@ function makeStaff(opts = {})
         scouted: !!opts.scouted,
         scoutOffset: {}, // stable fuzz for unscouted view
         employer: opts.employer ?? null,
+        look: randomLook(),
     };
     // traits: 1-2
     const nTraits = wmChance(.45) ? 2 : 1;
@@ -151,7 +152,7 @@ function isAvailable(s) { return !s.injury; }
 
 // ---------------------------------------------------------------------------
 // Career creation
-function newCareer(managerName, companyName)
+function newCareer(managerName, companyName, look = null, hex = null)
 {
     wmNextId = 1;
     const tier = 0;
@@ -199,6 +200,9 @@ function newCareer(managerName, companyName)
         pendingMilestones: [],
         nextMsgId: 1,
     };
+    ensureLegacy(career);
+    if (look) career.manager.look = look;
+    if (hex) career.companyHex = hex;
     resetSeasonStats();
     resetWeekLedger();
     refreshMarket(true);
@@ -240,7 +244,7 @@ function pendingDecisions() { return career.inbox.filter(m => m.actions && !m.re
 
 function milestone(key, detail = '')
 {
-    if (!['pbShift','promotion','upgrade'].includes(key) && career.milestones[key]) return;
+    if (!['pbShift','promotion','upgrade','homegrownDebut','homegrownHero','newJob','ownCompany'].includes(key) && career.milestones[key]) return;
     career.milestones[key] = (career.milestones[key] || 0) + 1;
     career.pendingMilestones.push({ key, detail });
 }
@@ -312,7 +316,7 @@ function shiftForecast()
     const peak = isPeakWeek() ? 1.3 : 1;
     const racking = 1 + career.facilities.racking * .03;
     const seed = (career.season * 997 + career.day * 131) % 100 / 100;
-    const volume = Math.round(t.volume * dayMul * peak * racking * (0.94 + seed * .12));
+    const volume = Math.round(t.volume * dayMul * peak * racking * (0.94 + seed * .12) * modMul('volume'));
     const hazmatShare = PACKAGE_TYPES.hazmat.weight * (seed > .7 ? 2 : 1);
     const returns = Math.round(volume * (dayIdx === 0 ? .1 : .06));
     const notes = [];
@@ -378,7 +382,7 @@ function applyShiftResult(res)
     for (const inj of res.injuries)
     {
         const s = c.staff.find(x => x.id === inj.id);
-        if (!s) continue;
+        if (!s || inj.fatal) continue;
         s.injury = { label: inj.label, days: inj.days, serious: inj.serious };
         s.stats.incidents++;
         s.morale = clamp(s.morale - (inj.serious ? 12 : 5), 0, 100);
@@ -387,6 +391,10 @@ function applyShiftResult(res)
             (inj.serious ? ` An investigation has been opened and the warehouse was fined ${wmMoney(inj.fine)}. Team morale has taken a hit.` : ''));
         if (inj.serious) for (const o of c.staff) o.morale = clamp(o.morale - 3, 0, 100);
     }
+
+    recordAccidents(res);
+    homegrownProgress(res);
+    tickMods();
 
     // records & milestones
     c.records.shiftsPlayed++;
@@ -510,6 +518,7 @@ function endWeek()
     const profit = L.revenue - L.penalties - L.fines - L.energy - L.overtime - L.other - L.wages - L.maintenance;
     summary.profit = profit;
     summary.ledger = { ...L };
+    legacyWeek(summary);
 
     awardWeeklyPoints();
     const pos = leaguePosition();
@@ -522,6 +531,7 @@ function endWeek()
         const ageF = s.age < 24 ? 1.4 : s.age < 30 ? 1.1 : s.age < 40 ? .8 : s.age < 50 ? .5 : .25;
         let f = .55 * ageF * (1 + c.facilities.training * .12) * traitMod(s, 'train') * (s.hidden.professionalism / 14);
         if (mentors.length && s.age < 26 && !mentors.includes(s)) f *= 1.3;
+        if (s.homegrown) f *= HOMEGROWN_TRAIN_MUL;
         const gap = s.hidden.potential - staffAbility(s);
         if (gap <= 0) f *= .12;
         if (s.injury) f *= .2;
@@ -591,15 +601,15 @@ function endWeek()
     const avgMorale = c.staff.reduce((a,s)=> a + s.morale, 0) / Math.max(1, c.staff.length);
     const moraleScore = avgMorale > 65 ? 1 : avgMorale < 40 ? -3 : 0;
     const leagueScore = pos <= 3 ? 2 : pos >= 7 ? -2 : 0;
-    const delta = Math.round(clamp((volScore + safetyScore + profitScore + moraleScore + leagueScore) * .8, -10, 8));
+    const delta = c.manager.owner ? 0 : Math.round(clamp((volScore + safetyScore + profitScore + moraleScore + leagueScore) * .8, -10, 8));
     c.board.confidence = clamp(c.board.confidence + delta, 0, 100);
     summary.board = { delta, volScore, safetyScore, profitScore, moraleScore, leagueScore, confidence:c.board.confidence, avgShipped, target };
-    pushMsg('board', `📊 Week ${c.week} board review (${delta >= 0 ? '+' : ''}${delta})`,
+    if (!c.manager.owner) pushMsg('board', `📊 Week ${c.week} board review (${delta >= 0 ? '+' : ''}${delta})`,
         `Average shipped ${Math.round(avgShipped*UNITS_PER_PARCEL)} units vs target ${Math.round(target*UNITS_PER_PARCEL)}. ` +
         `Incidents: ${L.incidents} (${L.serious} serious). Weekly profit ${wmMoney(profit)}. League position: ${ordinal(pos)}. ` +
         `Board confidence is now ${c.board.confidence}%.` + (c.board.confidence < 25 ? ' ⚠️ The board is losing patience.' : ''));
 
-    if (c.board.confidence <= 5)
+    if (c.board.confidence <= 5 && !c.manager.owner)
     {
         if (c.board.finalWarning) c.board.sacked = true;
         else
@@ -629,15 +639,20 @@ function endSeason()
     const table = leagueTable();
     const pos = table.findIndex(r => r.you) + 1;
     const res = { season:c.season, position:pos, table, promoted:false, sacked:false };
+    c.flags.stintSeasons = (c.flags.stintSeasons || 0) + 1;
+    if (pos === 1) { c.manager.trophies.push(`S${c.season} League Champions — ${c.company} (${tierDef().name})`); c.manager.wallet += 15000; }
     if (pos <= 2 && c.tier < TIER_DEFS.length - 1)
     {
         res.promoted = true;
         c.tier++;
         c.cash += 15000 * c.tier;
         c.board.confidence = clamp(c.board.confidence + 20, 0, 100);
+        c.manager.wallet += 8000 * c.tier;
+        c.manager.trophies.push(`S${c.season} Promotion — ${c.company} to ${TIER_DEFS[c.tier].name}`);
+        if (c.tier === TIER_DEFS.length - 1) milestone('empire', TIER_DEFS[c.tier].name);
         pushMsg('board', `🏆 Promotion to ${tierDef().name}!`, `Finishing ${ordinal(pos)} has earned ${c.company} a bigger site. Expect higher volume, bigger contracts — and tougher expectations.`);
     }
-    else if (pos >= 7 && c.board.confidence < 35)
+    else if (pos >= 7 && c.board.confidence < 35 && !c.manager.owner)
     {
         res.sacked = true;
         c.board.sacked = true;
@@ -656,7 +671,9 @@ function endSeason()
         for (const r of c.rivals) { r.strength = clamp(r.strength + (res.promoted ? 6 : 0) + wmGauss()*4, 30, 95); for (const s of r.staff) s.age++; }
         resetSeasonStats();
         refreshMarket(true);
-        c.reputation = clamp(c.reputation + (6 - pos) * 3, 5, 100);
+        c.manager.rep = clamp(c.manager.rep + (5 - pos) * 3 + (res.promoted ? 10 : 0), 0, 100);
+        if (!c.manager.owner) res.offers = generateOffers('season');
+        res.canFound = !c.manager.owner && canFoundCompany();
     }
     return res;
 }
@@ -840,7 +857,7 @@ function acceptChance(s, wage, weeks, isNewClub = false, fee = 0)
         if (rival) p -= (rival.strength - 45 - career.tier*8) / 200;
         if (hasTrait(s, 'Loyal') && s.employer) p -= .3;
         if (hasTrait(s, 'Ambitious')) p += .08;
-        p += (career.reputation - 40) / 300;
+        p += (career.manager.rep - 40) / 300;
     }
     return clamp(p, 0, .97);
 }
@@ -962,6 +979,7 @@ function loadCareer()
         {
             career = d.career;
             wmNextId = d.nextId || 1000;
+            ensureLegacy(career);
             return true;
         }
     } catch (e) { console.warn('load failed', e); }
