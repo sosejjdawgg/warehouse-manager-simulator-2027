@@ -42,8 +42,11 @@ class ShiftSim
             const z = c.lineup[s.id];
             if (!z || s.injury) continue;
             this.workers.push({
-                id:s.id, s, zone:z, state: z === 'bench' ? 'break' : 'idle',
-                energy: s.condition, pkg:null, progress:0, walkT:0, walkFrom:z,
+                id:s.id, s, zone:z, at:z, benchK:1, state: z === 'bench' ? 'break' : 'idle',
+                energy: s.condition, pkg:null, progress:0, walkFrom:z, path:null, pathI:0, pos:null,
+                crossing:null, crossWait:0, jaywalks:0, jay:false,
+                breakAt: 140 + Math.random() * 220, breakDone: z === 'bench', selfBreak:false, breakLeft:0,
+                patience: (1 + s.attrs.safety * .15 + s.attrs.concentration * .1) * traitMod(s, 'patience') * (1 + this.fac.safety * .08),
                 processed:0, errors:0, repairs:0, smooth:0, nearMisses:0, incident:null, injured:false,
                 activeTime:0, zoneTime:{}, anim:Math.random()*10, tiredWarned:false, speedCache:1,
             });
@@ -60,12 +63,20 @@ class ShiftSim
         this.steadyRate = this.forecast.volume * .4 / SHIFT_SECONDS;
         this.returnRate = this.forecast.returns / SHIFT_SECONDS;
 
+        // forklift traffic on the road loop
+        this.cwUsers = WH_MAP.crosswalks.map(()=> 0);
+        this.forklifts = [];
+        this.nextForkliftId = 1;
+        const nF = 4 + c.tier;
+        for (let i = 0; i < nF; i++) this.addForklift(i * WH_MAP.loopLen / nF);
+
         this.incidents = [];
         this.stats =
         {
             arrived:0, shipped:0, lateRush:0, rushShipped:0, defects:0, damaged:0, caught:0, returns:0,
             nearMisses:0, avoided:0, injuries:[], combo:0, flow:1, peakFlow:1, flowTimeSum:0,
             contractorCost:0, bottlenecks:0, breakdowns:0, hourly:[], interventions:0,
+            jaywalks:0, crossings:0, crossWait:0, forkliftBrakes:0,
         };
         this.lastHour = 0;
         this.aiTimer = 1;
@@ -82,7 +93,8 @@ class ShiftSim
         return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
     }
     worker(id) { return this.workers.find(w => w.id === id); }
-    zoneWorkers(z) { return this.workers.filter(w => w.zone === z && !w.injured && w.state !== 'walk'); }
+    isWalking(w) { return w.state === 'walk' || w.state === 'waitCross'; }
+    zoneWorkers(z) { return this.workers.filter(w => w.zone === z && !w.injured && !this.isWalking(w) && w.at === z); }
     crewCount(z) { return this.workers.filter(w => w.zone === z && !w.injured).length; }
 
     // ----------------------------------------------------------------- packages
@@ -158,17 +170,163 @@ class ShiftSim
     {
         const w = this.worker(id);
         if (!w || w.injured || w.zone === zone) return false;
-        if (w.pkg) { const z = this.zones[w.zone]; z.queue.unshift(w.pkg); w.pkg = null; w.progress = 0; }
-        if (w.incident) { /* walking away from a hazard counts as an intervention */ this.intervene(w.incident.id, true); }
-        w.walkFrom = w.zone;
+        if (w.incident && w.incident.type === 'strike') return false; // frozen in the forklift lane
+        if (w.pkg && !this.isWalking(w)) { this.zones[w.at]?.queue?.unshift(w.pkg); w.pkg = null; w.progress = 0; }
+        if (w.incident) this.intervene(w.incident.id, true); // walking away from a hazard defuses it
+        const from = w.zone;
+        w.walkFrom = from;
         w.movedAt = this.t;
         w.zone = zone;
-        w.state = 'walk';
-        w.walkT = zone === 'bench' || w.walkFrom === 'bench' ? 1.2 : 1.6;
+        w.selfBreak = false;
+        w.repairTarget = null;
         w.tiredWarned = false;
-        this.emit('move', { w, from:w.walkFrom, to:zone });
+        if (!this.isWalking(w)) this.startWalk(w, zone); // otherwise re-routes on arrival
+        this.emit('move', { w, from, to:zone });
         return true;
     }
+
+    // ----------------------------------------------------------------- walking & road crossings
+    startWalk(w, dest)
+    {
+        w.path = WH_MAP.path(w.at, dest, w.benchK);
+        w.pathI = 1;
+        w.pos = { x:w.path[0].x, y:w.path[0].y };
+        w.walkDest = dest;
+        w.state = 'walk';
+        w.crossWait = 0;
+        if (w.path.length <= 1) this.arriveWalk(w);
+    }
+    arriveWalk(w)
+    {
+        const last = w.path[w.path.length - 1];
+        w.at = w.walkDest;
+        if (w.at === 'bench') w.benchK = +last.node.slice(5) || 1;
+        w.path = null;
+        if (w.selfBreak && w.at === 'bench') { w.state = 'break'; this.emit('arrive', { w }); return; }
+        if (w.zone !== w.at && !(w.zone === 'black' && w.repairTarget === w.at)) { this.startWalk(w, w.zone); return; }
+        w.state = w.zone === 'bench' ? 'break' : (w.zone === 'black' && w.repairTarget) ? 'repair' : 'idle';
+        this.emit('arrive', { w });
+    }
+    crossCheck(cw)
+    {
+        const L = WH_MAP.loopLen;
+        let clear = true, f = null, d = 1e9;
+        for (const fl of this.forklifts)
+        {
+            const ahead = ((cw.s - fl.s) % L + L) % L;
+            const past = ((fl.s - cw.s) % L + L) % L;
+            if (past < 1.7) { clear = false; f = fl; d = 0; continue; }
+            if (ahead < d) { d = ahead; f = fl; }
+            if (ahead < 3 + fl.speed * 1.4) clear = false;
+        }
+        return { clear, f, d };
+    }
+    patienceOf(w) { return w.patience * (this.lineSpeed === 'push' ? .65 : this.lineSpeed === 'slow' ? 1.3 : 1); }
+    updateWalker(w, dt)
+    {
+        if (w.incident && w.incident.type === 'strike') return; // frozen, forklift bearing down
+        w.energy = Math.max(0, w.energy - .03 * dt);
+        const wp = w.path[w.pathI];
+        if (wp.cw && !w.crossing)
+        {
+            const chk = this.crossCheck(wp.cw);
+            if (chk.clear)
+            {
+                w.crossing = wp.cw; w.jay = false;
+                this.cwUsers[wp.cw.id]++;
+                this.stats.crossings++;
+                if (w.state === 'waitCross') this.emit('crossClear', { w });
+                w.state = 'walk';
+            }
+            else
+            {
+                if (w.state !== 'waitCross') { w.state = 'waitCross'; w.crossWait = 0; this.emit('waitCross', { w }); }
+                w.crossWait += dt;
+                this.stats.crossWait += dt;
+                if (w.crossWait > this.patienceOf(w) && chk.d > 1 && Math.random() < .7 * dt)
+                {
+                    // most impatient staff wait for a gap that *looks* big enough; some misjudge it badly
+                    const misjudge = Math.random() < .3 * traitMod(w.s, 'risk') * (1.3 - w.s.attrs.concentration / 30);
+                    if (misjudge || chk.d > 4.8 || (chk.f && chk.f.speed < .5)) this.jaywalk(w, wp.cw, chk);
+                }
+                return;
+            }
+        }
+        const speed = 3.6 * (.85 + w.s.attrs.adaptability / 40) * (.75 + .25 * w.energy / 100) * (w.jay ? 1.35 : 1);
+        const dx = wp.x - w.pos.x, dy = wp.y - w.pos.y, dist = Math.hypot(dx, dy), step = speed * dt;
+        if (dist <= step)
+        {
+            w.pos.x = wp.x; w.pos.y = wp.y;
+            if (w.crossing) { this.cwUsers[w.crossing.id]--; w.crossing = null; w.jay = false; }
+            w.pathI++;
+            if (w.pathI >= w.path.length) this.arriveWalk(w);
+        }
+        else { w.pos.x += dx / dist * step; w.pos.y += dy / dist * step; }
+    }
+    jaywalk(w, cw, chk)
+    {
+        w.crossing = cw; w.jay = true; w.state = 'walk';
+        w.jaywalks++;
+        this.cwUsers[cw.id]++;
+        this.stats.jaywalks++;
+        this.emit('jaywalk', { w, cw });
+        const f = chk.f;
+        if (f && f.speed > 1 && chk.d < 1.2 + f.speed * .9)
+        {
+            this.raiseIncident(w, 'strike');
+            f.hold = w.incident;
+        }
+        else if (f && f.speed > .3 && chk.d < 9)
+        {
+            f.speed *= .35;
+            this.stats.forkliftBrakes++;
+            this.emit('brake', { f, w });
+        }
+    }
+
+    // ----------------------------------------------------------------- forklifts
+    addForklift(s, temp = false)
+    {
+        const loads = ['standard','heavy','fragile','hazmat',null];
+        this.forklifts.push({ id:this.nextForkliftId++, s, speed:0, max: 3.1 + Math.random() * .7, stopT:0, dwellT:0, hold:null,
+            braking:false, temp, life: temp ? 75 : 1e9, load: loads[Math.floor(Math.random() * loads.length)] });
+    }
+    updateForklifts(dt)
+    {
+        const L = WH_MAP.loopLen;
+        const mod = (v)=> ((v % L) + L) % L;
+        for (const f of this.forklifts)
+        {
+            let target = f.max * LINE_SPEEDS[this.lineSpeed].speed * (1 - this.fac.safety * .04);
+            if (f.stopT > 0) { f.stopT -= dt; target = 0; f.speed = Math.min(f.speed, .2); }
+            if (f.hold) { if (f.hold.done) f.hold = null; else target = 0; }
+            if (f.dwellT > 0) { f.dwellT -= dt; target = 0; }
+            else if (Math.random() < .025 * dt) { f.dwellT = 1 + Math.random() * 2.5; f.load = f.load ? null : 'standard'; }
+            // people on a crossing ahead
+            WH_MAP.crosswalks.forEach((cw, i)=>
+            {
+                if (!this.cwUsers[i]) return;
+                const ahead = mod(cw.s - f.s);
+                if (ahead > .2 && ahead < 2.6) target = 0;
+                else if (ahead < 7) target = Math.min(target, 1.1);
+            });
+            // traffic ahead
+            for (const o of this.forklifts)
+            {
+                if (o === f) continue;
+                const gap = mod(o.s - f.s);
+                if (gap < 2.8) target = 0;
+                else if (gap < 5.5) target = Math.min(target, o.speed);
+            }
+            f.braking = target < f.speed - .15;
+            const acc = target > f.speed ? 2.5 : 9;
+            f.speed += clamp(target - f.speed, -acc * dt, acc * dt);
+            f.s = mod(f.s + f.speed * dt);
+            f.life -= dt;
+        }
+        this.forklifts = this.forklifts.filter(f => f.life > 0 || f.hold);
+    }
+
     setLineSpeed(k) { this.lineSpeed = k; this.emit('lineSpeed', { k }); }
     toggleRush(z) { this.zones[z].rushFirst = !this.zones[z].rushFirst; return this.zones[z].rushFirst; }
     callOvertime()
@@ -198,7 +356,12 @@ class ShiftSim
         if (w) w.incident = null;
         this.stats.avoided++;
         this.stats.interventions++;
-        if (!quiet) this.zones[inc.zone].pausedUntil = Math.max(this.zones[inc.zone].pausedUntil, this.t + 3);
+        if (inc.type === 'strike')
+        {
+            const f = this.forklifts.find(fl => fl.hold === inc);
+            if (f) { f.hold = null; f.stopT = 2.5; f.speed = 0; }
+        }
+        else if (!quiet) this.zones[inc.zone].pausedUntil = Math.max(this.zones[inc.zone].pausedUntil, this.t + 3);
         this.emit('avoided', { inc, w });
         return true;
     }
@@ -219,6 +382,7 @@ class ShiftSim
         }
 
         this.updateArrivals(dt);
+        this.updateForklifts(dt);
         this.updateBreakdowns(dt);
         for (const w of this.workers) this.updateWorker(w, dt);
         this.updateIncidents(dt);
@@ -240,6 +404,7 @@ class ShiftSim
                 const n = Math.round(this.truckSize * (.8 + Math.random()*.4));
                 this.dock += n;
                 this.emit('truck', { n });
+                if (this.forklifts.length < 8) this.addForklift(0, true);
             }
         }
         while (this.arrivalAcc >= 1) { this.arrivalAcc--; this.dock++; }
@@ -277,7 +442,7 @@ class ShiftSim
                 if (zone.broken.progress >= zone.broken.work)
                 {
                     this.emit('repaired', { z, def:zone.broken.def });
-                    for (const w of this.workers) if (w.repairTarget === z) { w.repairTarget = null; if (w.zone === 'black') w.state = 'idle'; w.repairs++; }
+                    for (const w of this.workers) if (w.repairTarget === z) { w.repairTarget = null; if (w.zone === 'black' && !this.isWalking(w)) w.state = 'idle'; w.repairs++; }
                     zone.broken = null;
                     zone.contractor = false;
                 }
@@ -300,16 +465,27 @@ class ShiftSim
         if (w.injured) return;
         w.anim += dt;
         const s = w.s;
-        if (w.state === 'walk')
-        {
-            w.walkT -= dt;
-            if (w.walkT <= 0) { w.state = w.zone === 'bench' ? 'break' : 'idle'; this.emit('arrive', { w }); }
-            return;
-        }
-        if (w.zone === 'bench')
+        if (this.isWalking(w)) { this.updateWalker(w, dt); return; }
+        if (w.at === 'bench')
         {
             w.state = 'break';
             w.energy = Math.min(100, w.energy + dt * (.9 + this.fac.breakroom * .25));
+            if (w.selfBreak && (w.breakLeft -= dt) <= 0)
+            {
+                w.selfBreak = false;
+                this.startWalk(w, w.zone);
+                this.emit('breakOver', { w });
+            }
+            return;
+        }
+        // scheduled meal break (staggered) — everyone has to cross the floor
+        if (!w.breakDone && this.t >= w.breakAt && !w.pkg && this.t < SHIFT_SECONDS - 60 && !w.incident)
+        {
+            w.breakDone = true;
+            w.selfBreak = true;
+            w.breakLeft = 16;
+            this.startWalk(w, 'bench');
+            this.emit('breakTime', { w });
             return;
         }
         w.activeTime += dt;
@@ -335,19 +511,29 @@ class ShiftSim
         // maintenance crew
         if (w.zone === 'black')
         {
-            if (w.repairTarget && this.zones[w.repairTarget].broken) { w.state = 'repair'; return; }
-            // pick the broken zone with least repair cover
-            let target = null, best = 1e9;
-            for (const z of ZONE_KEYS)
+            if (w.repairTarget && !this.zones[w.repairTarget].broken) w.repairTarget = null;
+            if (!w.repairTarget)
             {
-                const b = this.zones[z].broken;
-                if (!b) continue;
-                const cover = this.workers.filter(o => o.repairTarget === z).length;
-                const score = cover * 100 + b.t0;
-                if (score < best) { best = score; target = z; }
+                // pick the broken zone with least repair cover
+                let target = null, best = 1e9;
+                for (const z of ZONE_KEYS)
+                {
+                    const b = this.zones[z].broken;
+                    if (!b) continue;
+                    const cover = this.workers.filter(o => o.repairTarget === z).length;
+                    const score = cover * 100 + b.t0;
+                    if (score < best) { best = score; target = z; }
+                }
+                if (target) { w.repairTarget = target; this.emit('dispatch', { w, z:target }); }
             }
-            if (target) { w.repairTarget = target; w.state = 'repair'; this.emit('dispatch', { w, z:target }); }
-            else { w.state = 'idle'; w.energy = Math.min(100, w.energy + dt * .2); }
+            if (w.repairTarget)
+            {
+                if (w.at === w.repairTarget) w.state = 'repair';
+                else this.startWalk(w, w.repairTarget);
+                return;
+            }
+            if (w.at !== 'black') { this.startWalk(w, 'black'); return; }
+            w.state = 'idle'; w.energy = Math.min(100, w.energy + dt * .2);
             return;
         }
 
@@ -454,9 +640,9 @@ class ShiftSim
     // ----------------------------------------------------------------- incidents
     raiseIncident(w, forced = null)
     {
-        const def = ZONE_DEFS[w.zone];
+        const def = ZONE_DEFS[w.zone] || ZONE_DEFS.black;
         const type = forced || wmPick(def.incidents);
-        const window = 5 + w.s.attrs.concentration * .1 + (hasTrait(w.s, 'Steady') ? 1.5 : 0);
+        const window = type === 'strike' ? 2.6 + w.s.attrs.concentration * .05 : 5 + w.s.attrs.concentration * .1 + (hasTrait(w.s, 'Steady') ? 1.5 : 0);
         const inc = { id:this.nextIncId++, workerId:w.id, zone:w.zone, type, t0:this.t, window, done:false, aiRolled:false };
         w.incident = inc;
         this.incidents.push(inc);
@@ -490,9 +676,10 @@ class ShiftSim
                 const inj = { id:s.id, name:s.name, label:row[0], days, serious, fine, cause:d.label, zone:w.zone };
                 this.stats.injuries.push(inj);
                 w.injured = true;
-                if (w.pkg) { this.zones[w.zone].queue.unshift(w.pkg); w.pkg = null; }
+                if (w.crossing) { this.cwUsers[w.crossing.id]--; w.crossing = null; }
+                if (w.pkg) { this.zones[w.at]?.queue?.unshift(w.pkg); w.pkg = null; }
                 w.state = 'injured';
-                this.zones[w.zone].pausedUntil = this.t + (serious ? 15 : 6);
+                if (this.zones[w.at]?.pausedUntil !== undefined) this.zones[w.at].pausedUntil = this.t + (serious ? 15 : 6);
                 this.stats.combo = 0;
                 this.emit('injury', { inc, w, inj });
             }
@@ -544,13 +731,13 @@ class ShiftSim
         const empty = main.find(z => this.crewCount(z) === 0 && this.zones[z].queue.length > (FLOW_STANDARD.includes(z) ? 0 : 5));
         if (empty)
         {
-            const pool = this.workers.filter(w => !w.injured && w.state !== 'walk' && (w.zone === 'bench' || this.crewCount(w.zone) >= 2))
+            const pool = this.workers.filter(w => !w.injured && !this.isWalking(w) && (w.zone === 'bench' || this.crewCount(w.zone) >= 2))
                 .sort((a,b)=> (b.zone === 'bench') - (a.zone === 'bench') || zoneRating(b.s, empty) - zoneRating(a.s, empty));
             if (pool[0]) { this.moveWorker(pool[0].id, empty); return; }
         }
         // fatigue rotation
         const bench = this.workers.filter(w => w.zone === 'bench' && !w.injured && w.state === 'break');
-        const tired = this.workers.filter(w => w.zone !== 'bench' && !w.injured && w.state !== 'walk' && w.energy < 22).sort((a,b)=> a.energy - b.energy)[0];
+        const tired = this.workers.filter(w => w.zone !== 'bench' && !w.injured && !this.isWalking(w) && w.energy < 22).sort((a,b)=> a.energy - b.energy)[0];
         if (tired)
         {
             const fresh = bench.filter(w => w.energy > 55).sort((a,b)=> zoneRating(b.s, tired.zone) - zoneRating(a.s, tired.zone))[0];
@@ -573,12 +760,12 @@ class ShiftSim
         // never strip a zone downstream of the jam: the work is about to reach it
         const hotIdx = flow.indexOf(hot);
         const donors = main.filter(z => z !== hot && this.zones[z].queue.length <= 1 && upstreamQ(z) <= 2 &&
-                (!flow.includes(z) || hotIdx < 0 || flow.indexOf(z) < hotIdx) &&
+                (!flow.includes(z) || hotIdx < 0 || flow.indexOf(z) < hotIdx || this.crewCount(hot) <= 1) &&
                 (this.crewCount(z) >= 2 || (z === 'grey' && this.crewCount(z) >= 1 && this.t > 60)))
             .sort((a,b)=> pressure(a) - pressure(b));
         const donor = donors[0];
         if (!donor) return;
-        const cand = this.workers.filter(w => w.zone === donor && !w.injured && w.state !== 'walk' && this.t - (w.movedAt ?? -99) > 45)
+        const cand = this.workers.filter(w => w.zone === donor && !w.injured && !this.isWalking(w) && this.t - (w.movedAt ?? -99) > 45)
             .sort((a,b)=> zoneRating(b.s, hot) - zoneRating(a.s, hot))[0];
         if (cand && Math.random() < .5 + q * .5) this.moveWorker(cand.id, hot);
     }
@@ -638,13 +825,13 @@ class ShiftSim
                     const eff = expected ? w.processed / (expected * Math.max(.05, workT / active)) : 0;
                     const util = workT / active;
                     rating = 6.3 + (eff - .9) * 3.5 + (util > .75 ? .3 : util < .3 ? -.2 : 0)
-                        + (w.smooth / Math.max(1, w.processed) - .5) * .8 - w.errors * .15 - w.nearMisses * .15;
+                        + (w.smooth / Math.max(1, w.processed) - .5) * .8 - w.errors * .15 - w.nearMisses * .15 - w.jaywalks * .25;
                 }
                 if (w.injured) rating -= .8;
                 rating = wmRound1(clamp(rating, 3, 10));
             }
             return { id:w.id, name:w.s.name, zone:w.zone, rating, processed:w.processed, errors:w.errors, repairs:w.repairs,
-                energy:Math.round(w.energy), injured:w.injured, nearMisses:w.nearMisses, moraleDelta:0 };
+                energy:Math.round(w.energy), injured:w.injured, nearMisses:w.nearMisses, jaywalks:w.jaywalks, moraleDelta:0 };
         });
         const rated = workers.filter(w => w.rating);
         const workerOfShift = rated.sort((a, b)=> b.rating - a.rating)[0] || null;
@@ -657,6 +844,7 @@ class ShiftSim
             cpu: units ? totalCost / units : 0,
             onTime, csat, defects: st.defects, damaged: st.damaged, caught: st.caught, lateRush: st.lateRush, rushShipped: st.rushShipped,
             returns: st.returns, nearMisses: st.nearMisses, avoided: st.avoided, injuries: st.injuries,
+            jaywalks: st.jaywalks, crossings: st.crossings, crossWait: st.crossWait, forkliftBrakes: st.forkliftBrakes,
             peakFlow: st.peakFlow, avgFlow, bottlenecks: st.bottlenecks, breakdowns: st.breakdowns,
             uph: this.unitsPerHour(), overtimeHours: this.overtimeHours, simulated: this.simulated,
             hourly: [...st.hourly, st.shipped], workers, workerOfShift,

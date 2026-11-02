@@ -54,6 +54,9 @@ function wmBurst(name, pos, opts = {})
     return particleEffect(name, pos, opts);
 }
 
+// world-space text that never shrinks below a readable pixel size
+function wmText(text, pos, size, ...rest) { drawText(text, pos, Math.max(size, 10.5 / cameraScale), ...rest); }
+
 // ---------------------------------------------------------------------------
 // Floating stat bubbles
 class WmBubble
@@ -69,7 +72,7 @@ class WmBubble
         const p = this.t / this.life;
         const pop = p < .15 ? .6 + p / .15 * .5 : p < .25 ? 1.1 - (p - .15) : 1;
         const a = p > .7 ? 1 - (p - .7) / .3 : 1;
-        drawText(this.text, this.pos, this.size * pop, this.color.withAlpha(a), .12 * this.size, new Color(0,0,0,a*.85));
+        wmText(this.text, this.pos, this.size * pop, this.color.withAlpha(a), .12 * this.size, new Color(0,0,0,a*.85));
     }
 }
 
@@ -144,43 +147,23 @@ const shiftView =
     },
 
     // ---------------------------------------------------------------- layout
+    // The physical map lives in WH_MAP (shared with the sim). In portrait the
+    // whole warehouse is rotated a quarter turn so it fills a phone screen.
+    T(p) { return this.portrait ? vec2(p.y, -p.x) : vec2(p.x, p.y); },
+    TS(sz) { return this.portrait ? vec2(sz.y, sz.x) : vec2(sz.x, sz.y); },
+    TD(d) { return this.T(d); }, // directions rotate the same way
     layout(force = false)
     {
         const portrait = mainCanvasSize.y > mainCanvasSize.x * 1.05;
         if (!force && portrait === this.portrait && this.bounds) return;
         this.portrait = portrait;
         const R = {};
-        const put = (z, cx, cy, w, h)=> R[z] = { pos: vec2(cx, cy), size: vec2(w, h) };
-        if (!portrait)
-        {
-            const W = 7.4, H = 5.6, G = .55;
-            const grid = [['blue','green','yellow','orange'], ['purple','grey','black','red']];
-            for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++)
-                put(grid[r][c], (c - 1.5) * (W + G), (r === 0 ? 1 : 0) * (H + G) - (H + G) / 2 + 1.6, W, H);
-            put('bench', 0, -(H + G) - .1 + 1.6 - 1.5 - .15, 4 * W + 3 * G, 2.6);
-            put('dock', -2 * (W + G) - .35, R.blue.pos.y, 1.6, H);
-            put('bay', 2 * (W + G) + .35, R.red.pos.y, 1.6, H);
-        }
-        else
-        {
-            const W = 7.3, H = 5.1, G = .5;
-            const grid = [['blue','green'], ['orange','yellow'], ['red','purple'], ['grey','black']];
-            for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++)
-                put(grid[r][c], (c - .5) * (W + G), (1.5 - r) * (H + G) + 1.2, W, H);
-            put('bench', 0, -2.5 * (H + G) + 1.2 - .2, 2 * W + G, 2.6);
-            put('dock', R.blue.pos.x, R.blue.pos.y + H/2 + .9, W, 1.4);
-            put('bay', R.red.pos.x - W/2 - .8, R.red.pos.y, 1.2, H);
-        }
+        for (const k in WH_MAP.rects) { const r = WH_MAP.rects[k]; R[k] = { pos:this.T(r.pos), size:this.TS(r.size), top:r.top }; }
         this.rects = R;
-        // bounds
-        let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
-        for (const k in R)
-        {
-            const r = R[k];
-            minX = Math.min(minX, r.pos.x - r.size.x/2); maxX = Math.max(maxX, r.pos.x + r.size.x/2);
-            minY = Math.min(minY, r.pos.y - r.size.y/2); maxY = Math.max(maxY, r.pos.y + r.size.y/2);
-        }
-        this.bounds = { center: vec2((minX+maxX)/2, (minY+maxY)/2), size: vec2(maxX-minX, maxY-minY) };
+        const b = WH_MAP.bounds;
+        const c = this.T({ x:(b.minX + b.maxX)/2, y:(b.minY + b.maxY)/2 });
+        this.bounds = { center:c, size:this.TS({ x:b.maxX - b.minX, y:b.maxY - b.minY }) };
+        this.zoom = 1; this.pan = vec2();
     },
 
     zoneAt(pos, magnet = 0)
@@ -193,24 +176,28 @@ const shiftView =
         return null;
     },
 
-    // where a worker stands inside their zone
+    // where a worker stands inside the zone they're physically in
     slotPos(w)
     {
-        const r = this.rects[w.zone];
+        const at = w.at || w.zone;
+        const r = this.rects[at];
         if (!r) return vec2();
-        const mates = this.sim.workers.filter(o => o.zone === w.zone && !o.injured);
+        if (at === 'bench')
+        {
+            const mates = this.sim.workers.filter(o => o.at === 'bench' && !o.injured && !this.sim.isWalking(o));
+            const i = Math.max(0, mates.indexOf(w)), n = Math.max(1, mates.length);
+            const long = r.size.x >= r.size.y;
+            const span = (long ? r.size.x : r.size.y) - 3;
+            const t = n === 1 ? 0 : i / (n - 1) - .5;
+            return long ? vec2(r.pos.x + t * span, r.pos.y - .25) : vec2(r.pos.x, r.pos.y + t * span);
+        }
+        if (w.zone === 'black' && at !== 'black')
+        {
+            const i = this.sim.workers.filter(o => o.zone === 'black' && o.at === at).indexOf(w);
+            return vec2(r.pos.x + r.size.x/2 - .9 - Math.max(0, i) * .8, r.pos.y + r.size.y/2 - 1.7);
+        }
+        const mates = this.sim.workers.filter(o => o.zone === at && o.at === at && !o.injured);
         const i = Math.max(0, mates.indexOf(w));
-        if (w.zone === 'bench')
-        {
-            const n = Math.max(1, mates.length);
-            const span = r.size.x - 3;
-            return vec2(r.pos.x - span/2 + (n === 1 ? span/2 : i * span / (n - 1)) + 1, r.pos.y - .25);
-        }
-        if (w.zone === 'black' && w.state === 'repair' && w.repairTarget && this.rects[w.repairTarget])
-        {
-            const t = this.rects[w.repairTarget];
-            return vec2(t.pos.x + t.size.x/2 - 1 - i*.3, t.pos.y + t.size.y/2 - 1.6);
-        }
         const cols = 2;
         const cx = r.pos.x + r.size.x * .2 + (i % cols) * 1.45 - .1;
         const cy = r.pos.y + .55 - Math.floor(i / cols) * 1.55;
@@ -315,8 +302,9 @@ const shiftView =
                 const def = INCIDENT_DEFS[d.inc.type];
                 this.bubble(def.warn, p.add(vec2(0, 2)), '#fde047', .4, 2.2);
                 playSfx('warn', .9);
+                if (d.inc.type === 'strike') { playSfx('horn', 1, 1.6); addScreenShake(.15, .3); this.vignette = Math.max(this.vignette, .5); }
                 playSfx('ominous', .6);
-                if (!this.sim.assistantOn) hudToast(`⚠️ ${def.label} — ${ZONE_DEFS[d.inc.zone].name}! Tap the warning!`, '#facc15');
+                if (!this.sim.assistantOn) hudToast(d.inc.type === 'strike' ? `🚜 ${d.w.s.name} is in the forklift lane — TAP to stop the forklift!` : `⚠️ ${def.label} — ${ZONE_DEFS[d.inc.zone].name}! Tap the warning!`, d.inc.type === 'strike' ? '#ef4444' : '#facc15');
                 break;
             }
             case 'avoided':
@@ -386,6 +374,26 @@ const shiftView =
                 break;
             case 'move':
                 break;
+            case 'waitCross':
+                if (!fast && Math.random() < .35) this.bubble('Waiting for forklift…', this.workerPos(d.w).add(vec2(0, 1.6)), '#fde68a', .32, 1.2);
+                break;
+            case 'jaywalk':
+                this.bubble('JAYWALKING! 🏃', this.workerPos(d.w).add(vec2(0, 1.7)), '#f87171', .5, 1.6);
+                playSfx('buzz', .8, 1.4);
+                if (!this.sim.assistantOn) hudToast(`🏃 ${d.w.s.name} got impatient and ran across the forklift road!`, '#f87171');
+                break;
+            case 'brake':
+            {
+                const lp = WH_MAP.loopPos(d.f.s);
+                this.bubble('SCREEECH!', this.T(lp).add(vec2(0, 1)), '#fb923c', .5, 1.2);
+                playSfx('horn', .9, 1.3);
+                playSfx('glass', .3, .5);
+                addScreenShake(.12, .2);
+                break;
+            }
+            case 'breakTime':
+                if (!fast && Math.random() < .5) this.bubble('Meal break 🍔', this.workerPos(d.w).add(vec2(0, 1.4)), '#e2e8f0', .32, 1.2);
+                break;
             case 'arrive':
             {
                 const p = this.workerPos(d.w);
@@ -430,6 +438,11 @@ const shiftView =
         // camera
         const top = Math.min(110, mainCanvasSize.y * .17), bottom = Math.min(96, mainCanvasSize.y * .15);
         cameraFit(this.bounds.center, this.bounds.size, .4, { top, bottom, left:6, right:6 });
+        if (mouseWheel && wmMode === 'shift') this.zoom = clamp(this.zoom * (1 - mouseWheel * .12), 1, 3.2);
+        const maxPan = this.bounds.size.scale(.5 * (1 - 1 / this.zoom));
+        this.pan = vec2(clamp(this.pan.x, -maxPan.x, maxPan.x), clamp(this.pan.y, -maxPan.y, maxPan.y));
+        setCameraScale(cameraScale * this.zoom);
+        cameraPos = cameraPos.add(this.pan);
 
         // input
         this.handleInput();
@@ -448,8 +461,9 @@ const shiftView =
         {
             const v = this.vis[w.id] || (this.vis[w.id] = { pos:this.slotPos(w), hop:0, face:1 });
             if (this.drag && this.drag.id === w.id && this.drag.moved) continue;
-            const target = w.injured ? this.rects.bay.pos.add(vec2(0, -8)) : this.slotPos(w);
-            const k = w.state === 'walk' ? .09 : .2;
+            const walking = this.sim.isWalking(w) && w.pos;
+            const target = w.injured ? this.rects.bay.pos.add(vec2(0, -8)) : walking ? this.T(w.pos).add(vec2(0, .3)) : this.slotPos(w);
+            const k = walking ? .35 : .2;
             const before = v.pos.x;
             v.pos = v.pos.lerp(target, Math.min(1, k * (this.paused ? 1 : Math.max(1, this.speed * .7))));
             if (Math.abs(v.pos.x - before) > .01) v.face = v.pos.x > before ? 1 : -1;
@@ -511,15 +525,24 @@ const shiftView =
                 if (d < best) { best = d; hit = w; }
             }
             if (hit) { this.drag = { id:hit.id, start:mousePosScreen.copy(), moved:false }; playSfx('pick'); return; }
-            // 4. zone tap: toggle rush priority
-            const z = this.zoneAt(mp);
-            if (z && z !== 'bench')
+            // 4. empty floor: drag to pan, tap a zone to toggle rush priority
+            this.panDrag = { start:mousePosScreen.copy(), pan:this.pan.copy(), moved:false, world:mp.copy() };
+            return;
+        }
+        if (this.panDrag)
+        {
+            const pd = this.panDrag;
+            if (!pd.moved && mousePosScreen.distance(pd.start) > 10 && this.zoom > 1.01) pd.moved = true;
+            if (pd.moved)
             {
-                const on = sim.toggleRush(z);
-                this.bubble(on ? 'Rush orders first ⚡' : 'First-in, first-out', mp, on ? '#facc15' : '#cbd5e1', .45);
-                playSfx('tick', 2);
+                const d = mousePosScreen.subtract(pd.start).scale(1 / cameraScale);
+                this.pan = pd.pan.add(vec2(-d.x, d.y));
             }
-            this.select(null);
+            if (!mouseIsDown(0))
+            {
+                this.panDrag = null;
+                if (!pd.moved) this.tapFloor(pd.world);
+            }
         }
         if (this.drag)
         {
@@ -555,6 +578,18 @@ const shiftView =
         }
     },
 
+    tapFloor(mp)
+    {
+        const z = this.zoneAt(mp);
+        if (z && z !== 'bench')
+        {
+            const on = this.sim.toggleRush(z);
+            this.bubble(on ? 'Rush orders first ⚡' : 'First-in, first-out', mp, on ? '#facc15' : '#cbd5e1', .45);
+            playSfx('tick', 2);
+        }
+        this.select(null);
+    },
+
     // ---------------------------------------------------------------- render
     render()
     {
@@ -564,15 +599,19 @@ const shiftView =
         const T = timeReal;
         // floor
         drawRect(this.bounds.center, this.bounds.size.add(vec2(2)), WM_FLOOR);
+        // roads, walkways and zebra crossings
+        this.drawRoads();
+        // overhead conveyors bridge the roads (buildings hide the rest)
+        this.drawConveyors();
         // dock + bay
         this.drawDock();
-        // conveyors between zones
-        this.drawConveyors();
         // zones
         for (const z of ZONE_KEYS) this.drawZone(z);
         this.drawBench();
         // parcels in flight
         for (const f of this.flyers) f.draw();
+        // forklift traffic
+        for (const f of sim.forklifts) this.drawForklift(f);
         // workers (dragged one last)
         const order = sim.workers.filter(w => !w.injured).sort((a, b)=> (this.drag?.id === a.id) - (this.drag?.id === b.id));
         for (const w of order) this.drawWorker(w);
@@ -588,7 +627,7 @@ const shiftView =
             if (w && this.hoverZone !== 'bench')
             {
                 const rt = zoneRating(w.s, this.hoverZone);
-                drawText(`${'★'.repeat(Math.round(starsFor(rt)))}${'☆'.repeat(5 - Math.round(starsFor(rt)))}  fit`, r.pos.add(vec2(0, -r.size.y/2 + .6)), .5, rt >= 12 ? wmHex('#fde047') : WHITE, .08, BLACK);
+                wmText(`${'★'.repeat(Math.round(starsFor(rt)))}${'☆'.repeat(5 - Math.round(starsFor(rt)))}  fit`, r.pos.add(vec2(0, -r.size.y/2 + .6)), .5, rt >= 12 ? wmHex('#fde047') : WHITE, .08, BLACK);
             }
         }
     },
@@ -618,44 +657,129 @@ const shiftView =
         const R = this.rects, sim = this.sim;
         const d = R.dock;
         drawRect(d.pos, d.size, wmHex('#111827'));
+        const long = d.size.y >= d.size.x;
         for (let i = -2; i <= 2; i++)
-            this.portrait ? drawRect(d.pos.add(vec2(i * 1.4, 0)), vec2(.08, d.size.y), wmHex('#fbbf24', .4))
-                          : drawRect(d.pos.add(vec2(0, i * 1.1)), vec2(d.size.x, .08), wmHex('#fbbf24', .4));
-        drawText('DOCK', d.pos.add(this.portrait ? vec2(-d.size.x/2 + .9, 0) : vec2(0, d.size.y/2 - .35)), .4, wmHex('#93c5fd'));
+            long ? drawRect(d.pos.add(vec2(0, i * 1.1)), vec2(d.size.x, .07), wmHex('#fbbf24', .35))
+                 : drawRect(d.pos.add(vec2(i * 1.1, 0)), vec2(.07, d.size.y), wmHex('#fbbf24', .35));
+        wmText('DOCK', d.pos.add(long ? vec2(0, d.size.y/2 - .35) : vec2(-d.size.x/2 + .8, 0)), .38, wmHex('#93c5fd'));
         const n = sim.dock;
-        drawText(`🚛 ${n}`, d.pos.add(this.portrait ? vec2(1.2, 0) : vec2(0, 0)), .55, n > 40 ? wmHex('#f87171') : n > 15 ? wmHex('#fbbf24') : WHITE, .08, BLACK);
-        // waiting pallets
+        wmText(`🚛 ${n}`, d.pos.add(long ? vec2(0, .9) : vec2(1.2, 0)), .5, n > 40 ? wmHex('#f87171') : n > 15 ? wmHex('#fbbf24') : WHITE, .08, BLACK);
         for (let i = 0; i < Math.min(n, 12); i++)
         {
-            const p = this.portrait ? d.pos.add(vec2(-2.4 + i * .42, -.4)) : d.pos.add(vec2(-.35 + (i % 2) * .7, -1.2 - Math.floor(i / 2) * .45));
+            const p = long ? d.pos.add(vec2(-.35 + (i % 2) * .7, -.3 - Math.floor(i / 2) * .45)) : d.pos.add(vec2(-1.6 + Math.floor(i / 2) * .45, -.35 + (i % 2) * .7));
             drawRect(p, vec2(.38), wmHex('#c8a165', .9));
         }
         const b = R.bay;
         drawRect(b.pos, b.size, wmHex('#111827'));
-        drawText('BAY', b.pos.add(vec2(0, b.size.y/2 - .35)), .38, wmHex('#fca5a5'));
-        drawText('🚚', b.pos, .9);
-        drawText(`${sim.stats.shipped * UNITS_PER_PARCEL}`, b.pos.add(vec2(0, -1.1)), .4, wmHex('#86efac'), .06, BLACK);
+        const blong = b.size.y >= b.size.x;
+        wmText('BAY', b.pos.add(blong ? vec2(0, b.size.y/2 - .35) : vec2(-b.size.x/2 + .7, 0)), .36, wmHex('#fca5a5'));
+        wmText('🚚', b.pos, .9);
+        wmText(`${sim.stats.shipped * UNITS_PER_PARCEL}`, b.pos.add(blong ? vec2(0, -1.1) : vec2(1.4, 0)), .4, wmHex('#86efac'), .06, BLACK);
+    },
+
+    drawRoads()
+    {
+        const T = this.sim.t;
+        const asphalt = wmHex('#262a31'), edge = wmHex('#facc15', .85), dash = new Color(1, 1, 1, .35);
+        const rect = (pos, size, color)=> drawRect(this.T(pos), this.TS(size), color);
+        // walkways (green, hatched edges)
+        for (const wk of WH_MAP.walkways)
+        {
+            rect(wk.pos, wk.size, wmHex('#14532d', .55));
+            const horiz = wk.size.x > wk.size.y;
+            for (const sgn of [-1, 1])
+                horiz ? rect({ x:wk.pos.x, y:wk.pos.y + sgn * (wk.size.y/2 - .04) }, { x:wk.size.x, y:.06 }, wmHex('#4ade80', .5))
+                      : rect({ x:wk.pos.x + sgn * (wk.size.x/2 - .04), y:wk.pos.y }, { x:.06, y:wk.size.y }, wmHex('#4ade80', .5));
+        }
+        // roads
+        for (const r of WH_MAP.roads)
+        {
+            rect(r.pos, r.size, asphalt);
+            const RW = WH_MAP.RW;
+            if (r.horiz)
+            {
+                for (const sgn of [-1, 1]) rect({ x:r.pos.x, y:r.pos.y + sgn * (RW/2 - .07) }, { x:r.size.x, y:.09 }, edge);
+                for (let x = r.pos.x - r.size.x/2 + .6; x < r.pos.x + r.size.x/2; x += 1.6) rect({ x, y:r.pos.y }, { x:.7, y:.07 }, dash);
+            }
+            else
+            {
+                for (const sgn of [-1, 1]) rect({ x:r.pos.x + sgn * (RW/2 - .07), y:r.pos.y }, { x:.09, y:r.size.y }, edge);
+                for (let y = r.pos.y - r.size.y/2 + .6; y < r.pos.y + r.size.y/2; y += 1.6) rect({ x:r.pos.x, y }, { x:.07, y:.7 }, dash);
+            }
+            // one-way arrows drifting with the traffic
+            const len = r.horiz ? r.size.x : r.size.y;
+            const off = (T * 1.5) % 6;
+            for (let t = -len/2 + 1.5 + off; t < len/2 - 1; t += 6)
+            {
+                const c = { x:r.pos.x + r.dir.x * t, y:r.pos.y + r.dir.y * t };
+                const d = r.dir, n = { x:-d.y, y:d.x };
+                const pts = [{ x:c.x + d.x * .45, y:c.y + d.y * .45 }, { x:c.x - d.x * .3 + n.x * .38, y:c.y - d.y * .3 + n.y * .38 }, { x:c.x - d.x * .3 - n.x * .38, y:c.y - d.y * .3 - n.y * .38 }]
+                    .map(p => this.T(p));
+                drawPoly(pts, new Color(1, 1, 1, .12));
+            }
+            wmText(r.horiz ? 'FORKLIFTS ONLY' : '', this.T({ x:r.pos.x + (r.key === 'main' ? -4.6 : 4.6), y:r.pos.y }), .3, new Color(1, .85, .2, .35), 0, BLACK, 'center', undefined, undefined, undefined, this.portrait ? -Math.PI/2 : 0);
+        }
+        // zebra crossings
+        WH_MAP.crosswalks.forEach((cw, i)=>
+        {
+            const users = this.sim.cwUsers[i];
+            const waiting = this.sim.workers.some(w => w.state === 'waitCross' && w.path && w.path[w.pathI]?.cw === cw);
+            const pulse = .5 + .5 * Math.sin(timeReal * 8);
+            const c = users ? wmHex('#fde047', .9) : waiting ? new Color(1, 1, 1, .55 + .35 * pulse) : new Color(1, 1, 1, .7);
+            for (let k = -2; k <= 2; k++) rect({ x:cw.x, y:cw.y + k * .42 }, { x:1.3, y:.22 }, c);
+            // stop lines for forklifts
+            rect({ x:cw.x + (cw.road === 'main' ? -1.05 : 1.05), y:cw.y }, { x:.1, y:WH_MAP.RW - .2 }, wmHex('#ef4444', .7));
+        });
+    },
+
+    drawForklift(f)
+    {
+        const lp = WH_MAP.loopPos(f.s);
+        const pos = this.T(lp);
+        const h = this.T({ x:lp.dx, y:lp.dy });
+        const n = vec2(-h.y, h.x);
+        const ang = Math.atan2(-h.y, h.x);
+        const o = (a, b)=> pos.add(h.scale(a)).add(n.scale(b));
+        const T = timeReal;
+        // blue pedestrian-warning spot projected ahead
+        drawCircleGradient(o(2.3, 0), 1.7, new Color(.2, .5, 1, f.speed > .3 ? .45 : .2), new Color(.2, .5, 1, 0));
+        drawEllipse(o(0, -.05), vec2(1.9, 1.3), new Color(0, 0, 0, .35), ang);
+        drawRect(o(-.15, 0), vec2(1.35, 1.0), wmHex('#f59e0b'), ang);          // body
+        drawRect(o(-.78, 0), vec2(.22, .98), wmHex('#374151'), ang);           // counterweight
+        drawRect(o(-.3, 0), vec2(.62, .72), wmHex('#1f2937'), ang);            // cab
+        drawRect(o(.58, 0), vec2(.14, .92), wmHex('#111827'), ang);            // mast
+        drawRect(o(1.0, .26), vec2(.78, .1), wmHex('#9ca3af'), ang);           // forks
+        drawRect(o(1.0, -.26), vec2(.78, .1), wmHex('#9ca3af'), ang);
+        if (f.load) { drawRect(o(1.02, 0), vec2(.7, .8), WM_PKG_COLORS[f.load] || WM_PKG_COLORS.standard, ang); drawRect(o(1.02, 0), vec2(.7, .08), new Color(0,0,0,.25), ang); }
+        const brake = f.braking || f.stopT > 0 || f.hold;
+        for (const sgn of [-1, 1]) drawRect(o(-.88, sgn * .36), vec2(.08, .18), brake ? wmHex('#ff2d2d') : wmHex('#7f1d1d'), ang);
+        const blink = Math.sin(T * 9 + f.id) > 0;
+        drawCircle(o(-.3, 0), .3, blink ? wmHex('#fb923c') : wmHex('#9a3412'));
+        if (f.hold)
+        {
+            const w = this.sim.worker(f.hold.workerId);
+            if (w) drawLine(pos, this.workerPos(w), .12, new Color(1, .15, .1, .5 + .5 * Math.sin(T * 14)));
+            wmText('‼️', o(0, 0).add(vec2(0, 1)), .7);
+        }
     },
 
     drawConveyors()
     {
         const R = this.rects, T = this.sim.t;
-        const link = (a, b, color, w = .35)=>
+        const link = (a, b, color, w = .3)=>
         {
             const pa = R[a].pos, pb = R[b].pos;
-            drawLine(pa, pb, w, color);
             const dir = pb.subtract(pa), len = dir.length(), n = dir.normalize();
+            // only the exposed overhead span between the two buildings is visible
+            drawLine(pa, pb, w + .12, new Color(0, 0, 0, .35));
+            drawLine(pa, pb, w, color);
             const step = 1.2, off = (T * 2) % step;
-            for (let d = off; d < len; d += step)
-            {
-                const p = pa.add(n.scale(d));
-                drawRect(p, vec2(.16), new Color(1, 1, 1, .25), Math.atan2(n.x, n.y));
-            }
+            for (let d = off; d < len; d += step) drawRect(pa.add(n.scale(d)), vec2(.14), new Color(1, 1, 1, .3), Math.atan2(n.x, n.y));
         };
-        const belt = wmHex('#334155');
+        const belt = wmHex('#475569', .85);
         for (let i = 0; i < FLOW_STANDARD.length - 1; i++) link(FLOW_STANDARD[i], FLOW_STANDARD[i+1], belt);
-        link('blue', 'purple', wmHex('#4c1d95', .8), .22);
-        link('purple', 'orange', wmHex('#4c1d95', .8), .22);
+        link('blue', 'purple', wmHex('#6d28d9', .8), .2);
+        link('purple', 'orange', wmHex('#6d28d9', .8), .2);
         link('dock', 'blue', belt);
         link('red', 'bay', belt);
     },
@@ -683,11 +807,11 @@ const shiftView =
         // header
         const hy = r.pos.y + r.size.y/2 - .45;
         drawRect(vec2(r.pos.x, hy), vec2(r.size.x - .22, .7), col.withAlpha(.35));
-        drawText(`${def.icon} ${def.name.toUpperCase()}`, vec2(r.pos.x - r.size.x/2 + .3, hy), .42, WHITE, .05, BLACK, 'left');
+        wmText(`${def.icon} ${def.name.toUpperCase()}`, vec2(r.pos.x - r.size.x/2 + .3, hy), .42, WHITE, .05, BLACK, 'left', undefined, undefined, r.size.x - 2.2);
         const q = zone.queue.length;
         const qc = q >= sim.cap ? '#f87171' : q > sim.cap * .6 ? '#fbbf24' : '#e2e8f0';
-        drawText(`${q}/${sim.cap}`, vec2(r.pos.x + r.size.x/2 - .3, hy), .38, wmHex(qc), .05, BLACK, 'right');
-        if (!zone.rushFirst && z !== 'black') drawText('FIFO', vec2(r.pos.x + r.size.x/2 - 1.9, hy), .3, wmHex('#94a3b8'));
+        wmText(`${q}/${sim.cap}`, vec2(r.pos.x + r.size.x/2 - .3, hy), .38, wmHex(qc), .05, BLACK, 'right');
+        if (!zone.rushFirst && z !== 'black') wmText('FIFO', vec2(r.pos.x + r.size.x/2 - 1.9, hy), .3, wmHex('#94a3b8'));
         // queue stack
         const shown = Math.min(q, 24);
         for (let i = 0; i < shown; i++)
@@ -699,9 +823,9 @@ const shiftView =
             drawRect(pos.add(vec2(0, .08)), vec2(.44, .06), new Color(0,0,0,.25));
             if (p.type === 'rush') drawRect(pos, vec2(.56), new Color(1, .85, .1, .25 + .2 * Math.sin(T * 8 + i)));
         }
-        if (q > 24) drawText(`+${q - 24}`, this.queueSlot(z, 23).add(vec2(.6, 0)), .32, WHITE);
+        if (q > 24) wmText(`+${q - 24}`, this.queueSlot(z, 23).add(vec2(.6, 0)), .32, WHITE);
         // overflow warning
-        if (q >= sim.cap) drawText('FULL', r.pos.add(vec2(-r.size.x/2 + 1.7, -r.size.y/2 + .5 + 2.3)), .45, wmHex('#f87171', .6 + .4 * Math.sin(T * 9)), .06, BLACK);
+        if (q >= sim.cap) wmText('FULL', r.pos.add(vec2(-r.size.x/2 + 1.7, -r.size.y/2 + .5 + 2.3)), .45, wmHex('#f87171', .6 + .4 * Math.sin(T * 9)), .06, BLACK);
         // breakdown badge
         if (zone.broken)
         {
@@ -709,15 +833,15 @@ const shiftView =
             const p = r.pos.add(vec2(r.size.x/2 - 1.2, r.size.y/2 - 1));
             const pulse = .5 + .5 * Math.sin(T * 7);
             drawCircle(p, 1.6 + pulse * .2, wmHex('#f97316', .25 + pulse * .2));
-            drawText(b.def.icon, p, .7);
+            wmText(b.def.icon, p, .7);
             const pr = clamp(b.progress / b.work, 0, 1);
             drawRect(p.add(vec2(0, -.85)), vec2(1.4, .18), new Color(0,0,0,.6));
             drawRect(p.add(vec2(-.7 + pr * .7, -.85)), vec2(1.4 * pr, .18), wmHex('#a3e635'));
-            if (!zone.contractor && !sim.crewCount('black')) drawText('tap: contractor', p.add(vec2(0, -1.2)), .26, wmHex('#fdba74'));
+            if (!zone.contractor && !sim.crewCount('black')) wmText('tap: contractor', p.add(vec2(0, -1.2)), .26, wmHex('#fdba74'));
         }
         // empty zone hint
-        if (!crew.length && z !== 'black' && q > 0) drawText('NO CREW', r.pos.add(vec2(1.4, 0)), .5, wmHex('#f87171', .6 + .4 * Math.sin(T * 6)), .06, BLACK);
-        if (z === 'black' && !crew.length) drawText('no maintenance cover', r.pos.add(vec2(0, -.3)), .32, wmHex('#94a3b8'));
+        if (!crew.length && z !== 'black' && q > 0) wmText('NO CREW', r.pos.add(vec2(1.4, 0)), .5, wmHex('#f87171', .6 + .4 * Math.sin(T * 6)), .06, BLACK);
+        if (z === 'black' && !crew.length) wmText('no maintenance cover', r.pos.add(vec2(0, -.3)), .32, wmHex('#94a3b8'));
     },
 
     drawBench()
@@ -725,7 +849,8 @@ const shiftView =
         const r = this.rects.bench;
         drawRect(r.pos, r.size, wmHex('#475569'));
         drawRect(r.pos, r.size.subtract(vec2(.2)), wmHex('#1e293b'));
-        drawText(`☕ BREAK ROOM  (lvl ${this.sim.fac.breakroom})  — drag staff here to rest`, vec2(r.pos.x - r.size.x/2 + .3, r.pos.y + r.size.y/2 - .35), .34, wmHex('#cbd5e1'), 0, BLACK, 'left');
+        if (r.size.x >= r.size.y) wmText(`☕ BREAK ROOM  (lvl ${this.sim.fac.breakroom})  — drag staff here to rest · scheduled meal breaks cross the forklift roads`, vec2(r.pos.x - r.size.x/2 + .3, r.pos.y + r.size.y/2 - .35), .34, wmHex('#cbd5e1'), 0, BLACK, 'left');
+        else wmText('☕ BREAK ROOM', r.pos.add(vec2(0, r.size.y/2 - .4)), .34, wmHex('#cbd5e1'), 0, BLACK);
     },
 
     drawWorker(w)
@@ -738,8 +863,9 @@ const shiftView =
         const working = w.state === 'work' || w.state === 'repair';
         const tired = w.energy < 25;
         if (working && !this.paused) p.y += Math.abs(Math.sin(w.anim * (8 + (s.attrs.workRate - 10) * .3))) * .08;
+        if (w.jay) drawCircle(p.add(vec2(0, .2)), 1.3, new Color(1, .1, .1, .25 + .2 * Math.sin(T * 16)));
         if (v.hop) p.y += Math.sin(v.hop / .25 * Math.PI) * .25;
-        if (w.state === 'walk') p.y += Math.abs(Math.sin(T * 14)) * .12;
+        if (w.state === 'walk') p.y += Math.abs(Math.sin(T * (w.jay ? 22 : 14))) * .12;
         const scaleY = tired ? .88 : 1;
         const zc = w.zone === 'bench' ? wmHex('#64748b') : WM_ZONE_COLORS[w.zone];
         const sel = this.selected === w.id;
@@ -770,14 +896,23 @@ const shiftView =
         drawRect(p.add(vec2(0, -.76)), vec2(.8, .09), new Color(0,0,0,.6));
         drawRect(p.add(vec2(-.4 + e * .4, -.76)), vec2(.8 * e, .09), e > .5 ? wmHex('#4ade80') : e > .25 ? wmHex('#facc15') : wmHex('#ef4444'));
         // name + state icon
-        drawText(s.name.split(' ')[0], p.add(vec2(0, -1.02)), .3, WHITE, .05, BLACK);
+        wmText(s.name.split(' ')[0], p.add(vec2(0, -1.02)), .3, WHITE, .05, BLACK);
         let icon = '';
-        if (w.state === 'blocked') icon = '⛔';
+        if (w.state === 'waitCross')
+        {
+            const pt = clamp(w.crossWait / this.sim.patienceOf(w), 0, 1);
+            drawRect(p.add(vec2(0, 1.25)), vec2(.9, .12), new Color(0,0,0,.6));
+            drawRect(p.add(vec2(-.45 + pt * .45, 1.25)), vec2(.9 * pt, .12), pt < .6 ? wmHex('#facc15') : wmHex('#ef4444'));
+            icon = pt >= 1 ? '😤' : '⏳';
+        }
+        else if (w.jay) icon = '🏃';
+        else if (this.sim.isWalking(w) && w.selfBreak) icon = '🍔';
+        else if (w.state === 'blocked') icon = '⛔';
         else if (w.state === 'repair') icon = '🔧';
         else if (w.zone === 'bench') icon = '☕';
         else if (tired) icon = '😩';
         else if (w.state === 'idle' && w.zone !== 'black') icon = '…';
-        if (icon) drawText(icon, p.add(vec2(.45, .85)), .34);
+        if (icon) wmText(icon, p.add(vec2(.45, .85)), .34);
     },
 
     drawIncident(inc)
@@ -797,7 +932,7 @@ const shiftView =
             const a0 = i / segs * Math.PI * 2, a1 = (i + 1) / segs * Math.PI * 2;
             drawLine(p.add(vec2(Math.sin(a0) * rad, Math.cos(a0) * rad)), p.add(vec2(Math.sin(a1) * rad, Math.cos(a1) * rad)), .14, left < .35 ? wmHex('#dc2626') : wmHex('#111827'));
         }
-        drawText(INCIDENT_DEFS[inc.type].icon, p, .62);
-        drawText('TAP!', p.add(vec2(0, -1.05)), .36, wmHex('#fef08a', .7 + .3 * pulse), .06, BLACK);
+        wmText(INCIDENT_DEFS[inc.type].icon, p, .62);
+        wmText('TAP!', p.add(vec2(0, -1.05)), .36, wmHex('#fef08a', .7 + .3 * pulse), .06, BLACK);
     },
 };

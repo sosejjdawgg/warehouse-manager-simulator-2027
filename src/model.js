@@ -586,12 +586,12 @@ function endWeek()
     const target = tierDef().boardVol * (isPeakWeek() ? 1.2 : 1);
     const avgShipped = L.shifts ? L.shipped / L.shifts : 0;
     const volScore = clamp((avgShipped / target - 1) * 25, -8, 6);
-    const safetyScore = L.serious ? -6 * L.serious - L.incidents : L.incidents ? -1.5 * L.incidents : 3;
+    const safetyScore = L.incidents ? -1 * (L.incidents - L.serious) - 5 * L.serious : 3;
     const profitScore = profit > 0 ? clamp(profit / 1500, 0, 4) : clamp(profit / 1000, -6, 0);
     const avgMorale = c.staff.reduce((a,s)=> a + s.morale, 0) / Math.max(1, c.staff.length);
     const moraleScore = avgMorale > 65 ? 1 : avgMorale < 40 ? -3 : 0;
     const leagueScore = pos <= 3 ? 2 : pos >= 7 ? -2 : 0;
-    const delta = Math.round(volScore + safetyScore + profitScore + moraleScore + leagueScore);
+    const delta = Math.round(clamp((volScore + safetyScore + profitScore + moraleScore + leagueScore) * .8, -10, 8));
     c.board.confidence = clamp(c.board.confidence + delta, 0, 100);
     summary.board = { delta, volScore, safetyScore, profitScore, moraleScore, leagueScore, confidence:c.board.confidence, avgShipped, target };
     pushMsg('board', `📊 Week ${c.week} board review (${delta >= 0 ? '+' : ''}${delta})`,
@@ -599,7 +599,16 @@ function endWeek()
         `Incidents: ${L.incidents} (${L.serious} serious). Weekly profit ${wmMoney(profit)}. League position: ${ordinal(pos)}. ` +
         `Board confidence is now ${c.board.confidence}%.` + (c.board.confidence < 25 ? ' ⚠️ The board is losing patience.' : ''));
 
-    if (c.board.confidence <= 5) c.board.sacked = true;
+    if (c.board.confidence <= 5)
+    {
+        if (c.board.finalWarning) c.board.sacked = true;
+        else
+        {
+            c.board.finalWarning = true;
+            pushMsg('board', '🟥 FINAL WARNING from the board', 'Confidence has collapsed. Improve volume, safety or profit next week or you will be relieved of your duties.');
+        }
+    }
+    else if (c.board.confidence > 20) c.board.finalWarning = false;
 
     // rival drift
     for (const r of c.rivals) r.strength = clamp(r.strength + wmGauss()*1.5, 25, 92);

@@ -480,7 +480,8 @@ function showPreshift()
                 ${f.notes.length ? `<div class="notes">${f.notes.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
                 ${rivalLine ? `<p class="small muted">📰 ${esc(rivalLine.title)}</p>` : ''}
                 <div class="seg" title="Line speed">${Object.entries(LINE_SPEEDS).map(([k, d]) => `<button class="${c.defaultLineSpeed === k ? 'on' : ''}" data-act="lineDefault" data-k="${k}">${d.label}</button>`).join('')}</div>
-                <p class="tiny muted">Careful: −15% speed, −45% risk · Push: +18% speed, +80% risk, more fatigue</p>
+                <p class="tiny muted">Careful: −15% speed, −45% risk, staff wait patiently at crossings · Push: +18% speed, +80% risk, faster forklifts, impatient staff</p>
+                <p class="tiny muted">🚜 ${4 + c.tier} forklifts patrol the roads (more when trucks dock). Staff cross at zebra crossings — impatient ones (low Safety/Concentration, Speed Demons, Accident-Prone) jaywalk.</p>
             </section>
             <section class="card">
                 <div class="hrow"><h3>Zone assignments</h3><button data-act="autoLineup">✨ Auto-assign</button></div>
@@ -705,13 +706,14 @@ function showReport(res, replay = false)
                     <div><small>Injuries</small><b class="${r.injuries.length ? 'neg' : 'pos'}">${r.injuries.length}</b></div>
                 </div>
                 ${r.injuries.map(i => `<p class="small ${i.serious ? 'neg' : 'warn'}">${i.serious ? '🚨' : '🩹'} ${esc(i.name)} — ${esc(i.label)} (${esc(i.cause)}, ${ZONE_DEFS[i.zone].name}) · out ${i.days} shift${i.days > 1 ? 's' : ''}${i.fine ? ` · fine ${wmMoney(i.fine)}` : ''}</p>`).join('') || '<p class="pos small">🛡️ No injuries this shift.</p>'}
+                <p class="small">🚜 Road crossings ${r.crossings} · waited ${Math.round(r.crossWait)} min for forklifts · <span class="${r.jaywalks ? 'neg' : 'pos'}">🏃 jaywalks ${r.jaywalks}</span>${r.forkliftBrakes ? ` · emergency brakings ${r.forkliftBrakes}` : ''}</p>
                 <p class="small muted">Breakdowns ${r.breakdowns} · Bottlenecks ${r.bottlenecks} · Errors caught by QA ${r.caught} · Defects shipped ${r.defects} · Damaged ${r.damaged} · Rush orders late ${r.lateRush} of ${r.rushShipped}</p>
             </section>
             <section class="card"><h3>Ratings</h3>
                 <div class="slist">${r.workers.filter(w => w.rating).map(w => `
                     <div class="trow"><span class="rt ${ratingClass(w.rating)}">${w.rating.toFixed(1)}</span>
                     <span class="nm"><b>${esc(w.name)}</b>${r.workerOfShift && r.workerOfShift.id === w.id ? ' ⭐' : ''}${w.injured ? ' 🚑' : ''}</span>
-                    <span>${zonePill(w.zone)}</span><span class="small">📦 ${w.processed}${w.repairs ? ` 🔧 ${w.repairs}` : ''}${w.errors ? ` ❌ ${w.errors}` : ''}</span>
+                    <span>${zonePill(w.zone)}</span><span class="small">📦 ${w.processed}${w.repairs ? ` 🔧 ${w.repairs}` : ''}${w.errors ? ` ❌ ${w.errors}` : ''}${w.jaywalks ? ` 🏃 ${w.jaywalks}` : ''}</span>
                     <span class="small ${w.moraleDelta > 0 ? 'pos' : w.moraleDelta < 0 ? 'neg' : 'muted'}">${w.moraleDelta > 0 ? '▲' : w.moraleDelta < 0 ? '▼' : '•'} morale</span></div>`).join('')}</div>
             </section>
             <section class="card"><h3>Finances</h3>

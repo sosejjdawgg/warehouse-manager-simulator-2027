@@ -83,6 +83,7 @@ const INCIDENT_DEFS =
     chemical:  { label:'Chemical leak',       icon:'☣️', sevMul:2.0, warn:'Hazmat container leaking!' },
     electrical:{ label:'Electrical fault',    icon:'⚡', sevMul:1.6, warn:'Live panel exposed!' },
     medical:   { label:'Medical event',       icon:'🚑', sevMul:1.3, warn:'Worker feeling faint!' },
+    strike:    { label:'Forklift collision',  icon:'🚜', sevMul:2.1, warn:'Jaywalker in the forklift lane!' },
 };
 const INJURY_TABLE =
 [
@@ -112,20 +113,20 @@ const BREAKDOWN_DEFS =
 // by the shift simulation and the weekly management loop.
 const TRAIT_DEFS =
 {
-    Professional:   { good:true,  desc:'Consistent, trains hard, rarely complains.', train:1.25, consistency:3, morale:+2 },
-    Lazy:           { good:false, desc:'Slows down when unsupervised.', speed:.88, train:.7 },
-    'Accident-Prone':{good:false, desc:'Somehow always near the incident.', risk:1.7 },
+    Professional:   { good:true,  desc:'Consistent, trains hard, rarely complains.', train:1.25, consistency:3, morale:+2 , patience:1.3 },
+    Lazy:           { good:false, desc:'Slows down when unsupervised.', speed:.88, train:.7 , patience:1.2 },
+    'Accident-Prone':{good:false, desc:'Somehow always near the incident.', risk:1.7 , patience:.6 },
     Mentor:         { good:true,  desc:'Boosts training of young colleagues.', mentor:true },
     Perfectionist:  { good:true,  desc:'Very accurate, a bit slower.', accuracy:1.25, speed:.94 },
-    Clumsy:         { good:false, desc:'Damages fragile items.', damage:1.8, risk:1.2 },
+    Clumsy:         { good:false, desc:'Damages fragile items.', damage:1.8, risk:1.2 , patience:.85 },
     'Team Player':  { good:true,  desc:'Lifts zone teammates.', aura:.04 },
     Disruptive:     { good:false, desc:'Drags down the mood of the zone.', aura:-.05, morale:-3 },
     'Night Owl':    { good:true,  desc:'Strong finisher — less fatigue late in shifts.', fatigue:.8 },
-    Ambitious:      { good:true,  desc:'Wants to progress — prone to poaching.', train:1.15, poach:1.8 },
+    Ambitious:      { good:true,  desc:'Wants to progress — prone to poaching.', train:1.15, poach:1.8 , patience:.75 },
     Loyal:          { good:true,  desc:'Hard to poach; morale steady.', poach:.3, morale:+1 },
-    'Speed Demon':  { good:true,  desc:'Fast, but cuts corners.', speed:1.12, risk:1.25, accuracy:.92 },
-    Steady:         { good:true,  desc:'Calm under pressure.', panic:.6 },
-    Moody:          { good:false, desc:'Performance swings with morale.', moodSwing:2 },
+    'Speed Demon':  { good:true,  desc:'Fast, but cuts corners.', speed:1.12, risk:1.25, accuracy:.92 , patience:.5 },
+    Steady:         { good:true,  desc:'Calm under pressure.', panic:.6 , patience:1.6 },
+    Moody:          { good:false, desc:'Performance swings with morale.', moodSwing:2 , patience:.8 },
 };
 const TRAIT_KEYS = Object.keys(TRAIT_DEFS);
 
@@ -170,10 +171,10 @@ const FACILITY_DEFS =
 const TIER_DEFS =
 [
     // volume = forecast parcels per shift, rate = revenue per unit, boardVol = board's shipped-parcel target
-    { name:'Regional Depot',          volume:390, rate:.66, budget:30000,  boardVol:330, squad:14 },
-    { name:'Sort Centre',             volume:470, rate:.70, budget:55000,  boardVol:400, squad:17 },
-    { name:'Fulfilment Centre',       volume:550, rate:.75, budget:90000,  boardVol:470, squad:20 },
-    { name:'National Mega Hub',       volume:650, rate:.80, budget:150000, boardVol:560, squad:24 },
+    { name:'Regional Depot',          volume:370, rate:.68, budget:30000,  boardVol:310, squad:14 },
+    { name:'Sort Centre',             volume:470, rate:.70, budget:55000,  boardVol:375, squad:17 },
+    { name:'Fulfilment Centre',       volume:550, rate:.75, budget:90000,  boardVol:440, squad:20 },
+    { name:'National Mega Hub',       volume:650, rate:.80, budget:150000, boardVol:525, squad:24 },
 ];
 
 // Rival companies (fictional) — strength 0..100, archetype flavour

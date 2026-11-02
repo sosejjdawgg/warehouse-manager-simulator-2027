@@ -26,6 +26,13 @@ Single-file build: `npm install && npm run build` → `build/index.html` (one se
 | Maintenance | ⚫ Black | Auto-dispatched to breakdowns |
 | Break Room | ☕ | Drag tired staff here to recover energy |
 
+**The floor map.** The zones are buildings around a one-way forklift loop. Inbound, Stow, Pick and Pack sit north of the main forklift road. Hazmat, Quality, Maintenance and Outbound sit south of it. The Break Room is across a second forklift road. Doors open onto green walkways, corridors run between the buildings, and overhead conveyors carry parcels over the roads.
+
+- **Forklifts** (4 + one per warehouse tier, plus extras when trucks dock) circulate constantly. They stop to load, queue behind each other, and get faster on *Push*.
+- Staff **walk** between zones and to the break room, and **wait at zebra crossings** until the road is clear. Every worker also takes a staggered **meal break** mid-shift, so the roads are always busy.
+- **Patience** comes from Safety Awareness, Concentration, traits (Steady/Professional are patient; Speed Demon, Accident-Prone and Ambitious are not), line speed and Safety Systems. When it runs out, staff **jaywalk**. Usually the forklift slams on its brakes. If they misjudge the gap, a **forklift collision** warning appears with a very short timer: tap it to emergency-stop the forklift.
+- Moving staff now costs real time (walk plus crossing waits), so plan your rotations.
+
 **Controls**
 - **Drag** a worker to another zone. Stars show how well they fit it, and you get a warning if they lack a required certification.
 - **Tap a worker** to see their card, send them on a break, or move them back to their best zone.
@@ -35,6 +42,7 @@ Single-file build: `npm install && npm run build` → `build/index.html` (one se
 - **Line speed**: Careful / Normal / Push trades throughput against risk and fatigue.
 - **Overtime** adds up to +2h at 1.5× wages and tires the crew.
 - **🤖 Auto** hands the floor to your assistant manager. **⏩ Finish** simulates the rest of the shift.
+- **Pinch / mouse wheel** zooms the map. Drag empty floor to pan when zoomed.
 - Keyboard: `Space` pauses, `1` `2` `4` set the speed.
 
 Smooth hand-offs build a **Flow multiplier** (up to ×2.0) for faster work and bonus revenue. Bottlenecks break it.
@@ -55,6 +63,7 @@ Smooth hand-offs build a **Flow multiplier** (up to ×2.0) for faster work and b
 | File | Role |
 |---|---|
 | `src/data.js` | All content as data: zones, traits, certs, incidents, facilities, tiers, rivals |
+| `src/warehouseMap.js` | Physical floor map: buildings, forklift roads, walkways, zebra crossings, walking graph |
 | `src/model.js` | Career rules: staff generation, lineup, contracts, training, transfers, league, board, save/load |
 | `src/shiftSim.js` | `ShiftSim`, the shift engine, shared by live play and full simulation, plus the assistant AI |
 | `src/floor.js` | LittleJS rendering of the floor, drag-to-assign input, stat bubbles, particles, ZzFX sounds |
