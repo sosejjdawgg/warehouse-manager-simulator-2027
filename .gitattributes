@@ -1,0 +1,6 @@
+# Vendored from the LittleJS-AI plugin, not written here.
+dist/** -diff linguist-vendored
+build.mjs -diff linguist-vendored
+templates/** linguist-vendored
+*.zip binary
+*.png binary

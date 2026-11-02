@@ -1,0 +1,6 @@
+{
+    "title": "Warehouse Manager",
+    "name": "warehouseManager",
+    "engine": "dist/littlejs.js",
+    "sources": ["templates/gameFx.js", "src/data.js", "src/model.js", "src/shiftSim.js", "src/floor.js", "src/ui.js", "game.js"]
+}

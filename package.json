@@ -1,0 +1,6 @@
+{
+    "name": "warehouse-manager",
+    "private": true,
+    "scripts": { "build": "node build.mjs" },
+    "devDependencies": { "bestzip": "^2.2.1", "terser": "^5.31.0" }
+}

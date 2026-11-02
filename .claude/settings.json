@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "littlejs-ai": {
+      "source": { "source": "github", "repo": "KilledByAPixel/LittleJS-AI" }
+    }
+  },
+  "enabledPlugins": {
+    "littlejs@littlejs-ai": true
+  }
+}
