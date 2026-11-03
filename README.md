@@ -58,6 +58,10 @@ All the characters and cutscenes are original pixel art, generated in code (`src
 - **Lettering**: banded metallic letters with a thick outline and a 5×7 bitmap font for captions.
 - **Manager select**: pick from six default managers, each with stats and perks, or design your own. **Phil Barton** is the bald, smiling Jack of All Trades.
 
+## Android
+
+`android/` holds a minimal full-screen WebView wrapper (no Gradle needed). `android/build-apk.sh` bundles `build/index.html` into a signed APK using the Android SDK build tools. Saves live in the WebView's local storage, the game works fully offline, and the back button sends the app to the background instead of quitting mid-shift. Keep your signing keystore safe and out of the repo: Android will only accept updates signed with the same key.
+
 ## Legal
 
 © 2026 James Scott. All rights reserved. See `LICENSE`, `NOTICE` (third-party MIT licences) and `privacy.html`. The in-game About & legal screen covers the same ground.
