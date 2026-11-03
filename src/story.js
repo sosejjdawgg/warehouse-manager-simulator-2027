@@ -6,59 +6,6 @@
 // ============================================================================
 
 // ---------------------------------------------------------------------------
-// Chibi SVG portraits (also used for staff cards and the academy creator)
-function avatarSvg(look, opts = {})
-{
-    look = look || { skin:1, hair:0, style:0, hat:0, acc:0 };
-    const size = opts.size || 64, mood = opts.mood || 'neutral', vest = opts.vest || '#ff8a1f', hat = opts.hat !== false;
-    const skin = LOOK_SKIN[look.skin] || LOOK_SKIN[1], hair = LOOK_HAIR[look.hair] || LOOK_HAIR[0], hatC = LOOK_HAT[look.hat] || LOOK_HAT[0];
-    const O = '#2b2d42';
-    let hairBack = '', hairFront = '';
-    switch (look.style)
-    {
-        case 0: hairFront = `<path d="M30 40 Q50 22 70 40 Q66 30 50 28 Q34 30 30 40Z" fill="${hair}" stroke="${O}" stroke-width="2.5"/>`; break;
-        case 1: hairFront = `<path d="M28 42 L33 26 L40 34 L46 22 L52 33 L59 22 L63 34 L70 27 L72 42 Q50 30 28 42Z" fill="${hair}" stroke="${O}" stroke-width="2.5" stroke-linejoin="round"/>`; break;
-        case 2: hairBack = `<path d="M24 46 Q22 76 34 78 L66 78 Q78 76 76 46 Q74 24 50 24 Q26 24 24 46Z" fill="${hair}" stroke="${O}" stroke-width="2.5"/>`; break;
-        case 3: hairBack = `<circle cx="50" cy="20" r="10" fill="${hair}" stroke="${O}" stroke-width="2.5"/><path d="M27 46 Q28 26 50 25 Q72 26 73 46Z" fill="${hair}" stroke="${O}" stroke-width="2.5"/>`; break;
-        case 4: hairBack = `<path d="M23 46 Q20 92 30 96 L70 96 Q80 92 77 46 Q74 22 50 22 Q26 22 23 46Z" fill="${hair}" stroke="${O}" stroke-width="2.5"/>`; break;
-        default: break;
-    }
-    // eyes & mouth by mood
-    const eyes = {
-        happy:   `<path d="M38 55 Q42 50 46 55" stroke="${O}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M54 55 Q58 50 62 55" stroke="${O}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
-        sad:     `<ellipse cx="42" cy="56" rx="3.2" ry="4" fill="${O}"/><ellipse cx="58" cy="56" rx="3.2" ry="4" fill="${O}"/><path d="M36 49 L46 46" stroke="${O}" stroke-width="2.5" stroke-linecap="round"/><path d="M64 49 L54 46" stroke="${O}" stroke-width="2.5" stroke-linecap="round"/><path d="M60 62 q2 6 0 8" stroke="#5bc0ff" stroke-width="2.5" fill="none"/>`,
-        angry:   `<ellipse cx="42" cy="56" rx="3.4" ry="4" fill="${O}"/><ellipse cx="58" cy="56" rx="3.4" ry="4" fill="${O}"/><path d="M36 46 L47 51" stroke="${O}" stroke-width="3" stroke-linecap="round"/><path d="M64 46 L53 51" stroke="${O}" stroke-width="3" stroke-linecap="round"/>`,
-        shocked: `<circle cx="42" cy="55" r="5" fill="#fff" stroke="${O}" stroke-width="2"/><circle cx="58" cy="55" r="5" fill="#fff" stroke="${O}" stroke-width="2"/><circle cx="42" cy="55" r="2" fill="${O}"/><circle cx="58" cy="55" r="2" fill="${O}"/>`,
-        neutral: `<ellipse cx="42" cy="55" rx="3.4" ry="4.4" fill="${O}"/><ellipse cx="58" cy="55" rx="3.4" ry="4.4" fill="${O}"/><circle cx="43.2" cy="53.4" r="1.2" fill="#fff"/><circle cx="59.2" cy="53.4" r="1.2" fill="#fff"/>`,
-    }[mood] || '';
-    const mouth = {
-        happy:'<path d="M43 64 Q50 72 57 64 Z" fill="#c2410c" stroke="#2b2d42" stroke-width="2" stroke-linejoin="round"/>',
-        sad:'<path d="M44 68 Q50 63 56 68" stroke="#2b2d42" stroke-width="2.5" fill="none" stroke-linecap="round"/>',
-        angry:'<path d="M44 67 L56 67" stroke="#2b2d42" stroke-width="3" stroke-linecap="round"/>',
-        shocked:'<ellipse cx="50" cy="67" rx="4" ry="5" fill="#7c2d12" stroke="#2b2d42" stroke-width="2"/>',
-        neutral:'<path d="M45 65 Q50 68 55 65" stroke="#2b2d42" stroke-width="2.5" fill="none" stroke-linecap="round"/>',
-    }[mood];
-    let acc = '';
-    switch (look.acc)
-    {
-        case 1: acc = `<circle cx="42" cy="55" r="7" fill="rgba(255,255,255,.25)" stroke="${O}" stroke-width="2.5"/><circle cx="58" cy="55" r="7" fill="rgba(255,255,255,.25)" stroke="${O}" stroke-width="2.5"/><path d="M49 55 L51 55" stroke="${O}" stroke-width="2.5"/>`; break;
-        case 2: acc = `<path d="M30 56 Q32 82 50 84 Q68 82 70 56 Q66 70 58 70 L42 70 Q34 70 30 56Z" fill="${hair}" stroke="${O}" stroke-width="2.5"/>`; break;
-        case 3: acc = `<path d="M40 63 Q45 59 50 62 Q55 59 60 63 Q55 65 50 63 Q45 65 40 63Z" fill="${hair}" stroke="${O}" stroke-width="2"/>`; break;
-        case 4: acc = `<path d="M26 54 Q26 30 50 30 Q74 30 74 54" stroke="${O}" stroke-width="4" fill="none"/><rect x="21" y="50" width="9" height="14" rx="4" fill="#ef4444" stroke="${O}" stroke-width="2.5"/><rect x="70" y="50" width="9" height="14" rx="4" fill="#ef4444" stroke="${O}" stroke-width="2.5"/>`; break;
-        case 5: acc = `<path d="M28 42 Q50 34 72 42 L72 48 Q50 40 28 48Z" fill="#e11d48" stroke="${O}" stroke-width="2.5"/>`; break;
-    }
-    const hatSvg = hat ? `<path d="M26 44 Q26 20 50 19 Q74 20 74 44 Z" fill="${hatC}" stroke="${O}" stroke-width="3"/><rect x="21" y="40" width="58" height="7" rx="3.5" fill="${hatC}" stroke="${O}" stroke-width="3"/><path d="M36 26 Q42 22 48 22" stroke="rgba(255,255,255,.7)" stroke-width="3.5" fill="none" stroke-linecap="round"/><rect x="47" y="20" width="6" height="21" rx="3" fill="rgba(0,0,0,.12)"/>` : hairFront;
-    return `<svg class="ava" viewBox="0 0 100 100" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-        ${hairBack}
-        <path d="M18 100 Q20 78 50 78 Q80 78 82 100Z" fill="${vest}" stroke="${O}" stroke-width="3"/>
-        <path d="M30 88 L70 88" stroke="#fde047" stroke-width="5"/>
-        <circle cx="50" cy="52" r="24" fill="${skin}" stroke="${O}" stroke-width="3"/>
-        <ellipse cx="35" cy="62" rx="4.5" ry="3" fill="#ff8fa3" opacity=".7"/><ellipse cx="65" cy="62" rx="4.5" ry="3" fill="#ff8fa3" opacity=".7"/>
-        ${eyes}${mouth}${acc}${hat ? '' : ''}${hatSvg}
-    </svg>`;
-}
-
-// ---------------------------------------------------------------------------
 // Cast
 const CAST =
 {
@@ -353,7 +300,8 @@ function playStory(id, onDone, ctx = null)
     let el = document.getElementById('story');
     if (!el) { el = document.createElement('div'); el.id = 'story'; document.getElementById('ui').appendChild(el); }
     el.className = 'bg-' + (sc.bg || 'floor');
-    const castHtml = sc.cast.map((k, i)=> `<div class="actor ${i ? 'right' : 'left'}" data-cast="${k}">${avatarSvg(castLook(k), { size:200, mood:'neutral', vest:CAST[k].vest, hat:CAST[k].hat !== false })}</div>`).join('');
+    el.style.backgroundImage = `url(${pxBackdrop(sc.bg || 'floor')})`;
+    const castHtml = sc.cast.map((k, i)=> `<div class="actor ${i ? 'right' : 'left'}" data-cast="${k}">${avatarSvg(castLook(k), { size:256, mood:'neutral', vest:CAST[k].vest, hat:CAST[k].hat !== false })}</div>`).join('');
     el.innerHTML = `
         <div class="lb top"></div>
         <div class="stage"><div class="set"></div>${castHtml}</div>
@@ -382,7 +330,7 @@ function storyShowLine()
         const k = a.dataset.cast;
         const speaking = k === who;
         a.classList.toggle('speaking', speaking);
-        if (speaking) a.innerHTML = avatarSvg(castLook(k), { size:200, mood, vest:CAST[k].vest, hat:CAST[k].hat !== false });
+        if (speaking) a.innerHTML = avatarSvg(castLook(k), { size:256, mood, vest:CAST[k].vest, hat:CAST[k].hat !== false, pose: mood === 'angry' || mood === 'happy' ? 'fist' : '' });
     });
     storyType(text);
     document.getElementById('stChoices').innerHTML = '';

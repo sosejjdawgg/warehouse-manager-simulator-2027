@@ -1,10 +1,10 @@
 <!DOCTYPE html><head>
 <title>Warehouse Manager</title>
+<meta name=author content="James Scott">
+<meta name=copyright content="© 2026 James Scott. All rights reserved.">
 <meta charset=utf-8>
 <meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name=theme-color content="#0b0f17">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
 <style>
 :root{
   --ink:#2b2d42; --bg:#8fd17a; --panel:#ffffff; --panel2:#f4f1ff; --line:#2b2d42; --text:#2b2d42; --muted:#6b6f86;
@@ -12,7 +12,7 @@
   --r:22px; --pop:0 5px 0 var(--ink);
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);font:600 15px/1.35 Fredoka,"Baloo 2","Trebuchet MS",system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:600 15px/1.35 "Trebuchet MS","Segoe UI",Roboto,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
 #ui{position:fixed;inset:0;pointer-events:none;z-index:10}
 #ui>*{pointer-events:auto}
 .hidden{display:none!important}
@@ -318,7 +318,7 @@ body.inShift .toast{font-size:13.5px;padding:4px 10px}
 #story .chips{display:flex;flex-wrap:wrap;gap:6px}
 #story .chip{min-width:0;padding:3px 10px;border-radius:12px;font-size:13.5px;box-shadow:0 3px 0 var(--ink)}
 #story .chip.good{background:#d7f8c9}#story .chip.bad{background:#ffd6d6}
-@media (max-width:640px){#story .actor .ava{width:110px;height:110px}#story .actor{bottom:auto;top:calc(9vh + 16px)}#story .actor.right{top:calc(9vh + 60px)}#story .txt{font-size:16px}}
+@media (max-width:640px){#story .actor .ava{width:128px;height:128px}#story .actor{bottom:auto;top:calc(9vh + 16px)}#story .actor.right{top:calc(9vh + 60px)}#story .txt{font-size:16px}}
 
 /* ===== spectacle: parallax flyovers ===== */
 #parallax{position:fixed;inset:0;z-index:45;overflow:hidden;cursor:pointer;opacity:0;transition:opacity .3s}
@@ -424,6 +424,60 @@ body.finalHour .clock{background:#ffe1e1;animation:tense 1s ease-in-out infinite
 @keyframes spin{to{transform:rotate(360deg)}}
 .cineBox{position:relative}
 .cineBox h1{background:#ff5d8f;-webkit-text-stroke:0;color:#fff;text-shadow:0 4px 0 var(--ink);border:4px solid var(--ink);border-radius:14px;padding:4px 26px;display:inline-block;box-shadow:0 6px 0 var(--ink);transform:rotate(-2deg)}
+
+/* ===== pixel art overhaul ===== */
+img.pix,.ava.pix,#pxscene{image-rendering:pixelated;image-rendering:crisp-edges}
+.avaWrap .ava.pix{border-radius:8px;background:linear-gradient(180deg,#5d86a8,#2e4a6a);border:2.5px solid var(--ink)}
+.avaWrap.hg .ava.pix{background:linear-gradient(180deg,#6aa860,#2f5a2c)}
+#story .actor .ava.pix{border-radius:10px;background:linear-gradient(180deg,#5d86a8,#253e5a);border:5px solid var(--ink);box-shadow:0 8px 0 var(--ink),inset 0 0 0 3px #ffd23f}
+#story[style]{background-size:cover!important;background-position:center bottom!important;background-repeat:no-repeat!important;image-rendering:pixelated}
+#story .dlg{background:#141a3a;color:#fff;border:4px solid #ffd23f;box-shadow:0 0 0 4px var(--ink),0 8px 0 4px var(--ink);border-radius:12px}
+#story .plate{border-radius:6px}
+#story .txt{font-weight:700;letter-spacing:.02em}
+#story .choice{background:#fffdf5}
+#coach .ava.pix{border-radius:8px}
+#pxscene{position:fixed;inset:0;width:100vw;height:100vh;z-index:46;background:#000;display:none;cursor:pointer;object-fit:contain}
+#pxscene.show{display:block;animation:pxIn .25s ease-out}
+#pxscene.out{opacity:0;transition:opacity .25s}
+@keyframes pxIn{from{filter:brightness(4)}}
+.arcade{background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.18),transparent 60%)}
+.logoPx{position:relative;display:flex;flex-direction:column;align-items:center;margin-top:10px}
+.logoPx img{width:min(560px,86vw);height:auto;filter:drop-shadow(0 6px 0 rgba(20,10,42,.45))}
+.logoPx .l1{animation:logoIn .7s cubic-bezier(.2,1.6,.4,1) both;transform:rotate(-3deg)}
+.logoPx .l2{animation:logoIn .7s .2s cubic-bezier(.2,1.6,.4,1) both;margin-top:-34px;transform:rotate(-3deg)}
+@keyframes logoIn{from{transform:scale(3) rotate(-12deg);opacity:0}}
+.logoPhil{position:absolute;right:-110px;bottom:-30px;animation:philIn .6s .7s cubic-bezier(.2,1.6,.4,1) both}
+.logoPhil .ava{width:128px!important;height:128px!important}
+.logoPhil .ava{border-radius:12px;background:linear-gradient(180deg,#4d7f86,#2a4a50);border:4px solid var(--ink);box-shadow:0 6px 0 var(--ink)}
+@keyframes philIn{from{transform:translateX(60vw) rotate(10deg)}}
+@media (max-width:820px){.logoPhil{position:static;margin-top:8px}}
+.title .tag{width:min(560px,90vw);height:auto;margin-top:18px}
+.pressStart img{height:24px;width:auto;animation:blink 1s steps(2) infinite;margin:8px 0}
+.titleBtns{display:flex;flex-direction:column;gap:10px;align-items:stretch;width:min(360px,90vw)}
+.soundRow{justify-content:center;color:#fff}
+.copyright{text-align:center;color:#fff;font-size:12px;margin-top:10px}
+.copyright img{height:8px;width:auto;transform:scale(1.5);margin-bottom:6px}
+.select{max-width:1100px;margin:0 auto;padding:14px 12px 40px}
+.selTitle{text-align:center}
+.selTitle img{width:min(720px,94vw);height:auto;animation:logoIn .6s cubic-bezier(.2,1.6,.4,1) both}
+.mgrGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:12px 0}
+.mcard{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 6px 10px;background:var(--panel);border-radius:8px}
+.mcard .mframe{line-height:0}
+.mcard .mframe .ava{border-radius:4px;background:transparent;border:3px solid rgba(0,0,0,.35)}
+.mcard .mlabel{height:16px;width:auto;max-width:100%}
+.mcard.on{outline:4px solid #ffd23f;outline-offset:3px;transform:translateY(-4px);box-shadow:0 9px 0 var(--ink)}
+.p1{position:absolute;top:-30px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;animation:bob .6s infinite}
+.p1 img{background:#ffd23f;border:2px solid var(--ink);padding:2px 4px;height:22px;width:auto}
+.p1 i{width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:9px solid #ffd23f}
+.selInfo{max-width:640px;margin:10px auto;background:#1b2147;color:#fff;border-color:#ffd23f}
+.selInfo p{font-weight:500}
+.selHead img{display:block;height:auto;margin-bottom:4px}
+.sbars{display:grid;gap:5px;margin:10px 0}
+.sbar{display:grid;grid-template-columns:80px 1fr;align-items:center;font-size:13px;font-weight:700;letter-spacing:.08em}
+.sbar i{display:flex;gap:3px}
+.sbar b{flex:0 0 34px;height:12px;border:2px solid #000;border-radius:2px}
+.selInfo label,.selInfo .lpRow>span{color:#fff}
+.legal h3{margin-top:18px}.legal h4{margin:12px 0 2px;color:var(--ink)}.legal p,.legal li{font-weight:500;font-size:14px}
 </style>
 </head><body>
 <script src=dist/littlejs.js></script>
@@ -433,10 +487,13 @@ body.finalHour .clock{background:#ffe1e1;animation:tense 1s ease-in-out infinite
 <script src=src/legacy.js></script>
 <script src=src/model.js></script>
 <script src=src/shiftSim.js></script>
+<script src=src/pixel.js></script>
 <script src=src/floor.js></script>
 <script src=src/story.js></script>
 <script src=src/spectacle.js></script>
+<script src=src/pxscenes.js></script>
 <script src=src/ui.js></script>
 <script src=src/uiLegacy.js></script>
+<script src=src/select.js></script>
 <script src=game.js></script>
 </body>

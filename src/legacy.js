@@ -44,7 +44,7 @@ function addMod(key, value, shifts, label)
 }
 function modMul(key)
 {
-    let m = 1;
+    let m = career?.manager?.perks?.[key] ?? 1;
     for (const x of career?.mods || []) if (x.key === key && x.shifts > 0) m *= x.value;
     return m;
 }
@@ -58,7 +58,7 @@ function tickMods()
 // Homegrown academy
 function academySlots() { return 2 + career.facilities.training; }
 function academyCount() { return career.staff.filter(s => s.homegrown).length; }
-function recruitCost() { return 600 + career.tier * 300; }
+function recruitCost() { return Math.round((600 + career.tier * 300) * (career.manager.perks?.recruit ?? 1) / 10) * 10; }
 
 // Build a raw recruit (not yet signed) for the creator screen
 function draftRecruit(arch = 'speedster')

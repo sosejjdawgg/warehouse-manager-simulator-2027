@@ -12,7 +12,7 @@
 setDebugWatermark(false);
 setGLEnable(false);   // everything is Canvas2D: rounded, outlined, toy-like shapes
 setCanvasClearColor(new Color(.55, .82, .48)); // grass around the warehouse
-setFontDefault('Fredoka, "Baloo 2", "Trebuchet MS", system-ui, sans-serif');
+setFontDefault('"Trebuchet MS", "Segoe UI", Roboto, system-ui, sans-serif');
 
 ///////////////////////////////////////////////////////////////////////////////
 function gameInit()

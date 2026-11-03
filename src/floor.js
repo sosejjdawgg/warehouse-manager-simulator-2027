@@ -1009,7 +1009,7 @@ const shiftView =
         if (sel) NX.circ(ctx, p.x, p.y + .2, .85 + .05 * Math.sin(T * 8), 'rgba(255,255,255,.35)', '#ffffff', .08);
         if (w.jay) NX.circ(ctx, p.x, p.y + .2, 1 + .1 * Math.sin(T * 16), 'rgba(255,60,60,.3)', '#ff4d4d', .08);
         const vest = w.zone === 'bench' ? '#94a3b8' : ZONE_DEFS[w.zone].hex;
-        NX.chibi(ctx, p.x, p.y + bob, { look:s.look, vest, mood:this.workerMood(w), face:v.face, squash, step: walking ? Math.sin(T * (w.jay ? 22 : 14)) : 0, blink:(T + w.id * .37) % 4 < .12, homegrown:!!s.homegrown, sleepy:w.zone === 'bench' && w.state === 'break' });
+        NX.chibi(ctx, p.x, p.y + bob, { look:s.look, vest, mood:this.workerMood(w), face:v.face, squash, cheer:(v.hop || 0) > .05 && this.targetHit, step: walking ? Math.sin(T * (w.jay ? 22 : 14)) : 0, blink:(T + w.id * .37) % 4 < .12, homegrown:!!s.homegrown, sleepy:w.zone === 'bench' && w.state === 'break' });
         // carried parcel
         if (w.pkg && !this.sim.isWalking(w))
         {
@@ -1225,58 +1225,24 @@ const NX =
         NX.rr(ctx, 0, -1.45 + b, 1.1, .4, .15, '#d8f3ff', NX.O, .06);
         ctx.restore();
     },
-    // the star of the show: a chibi warehouse worker
+    // the star of the show: a pixel-art warehouse worker sprite
     chibi(ctx, x, y, o)
     {
-        const look = o.look || { skin:1, hair:0, style:0, hat:0, acc:0 };
-        const skin = LOOK_SKIN[look.skin] || LOOK_SKIN[1], hair = LOOK_HAIR[look.hair] || LOOK_HAIR[0], hat = LOOK_HAT[look.hat] || LOOK_HAT[0];
-        const O = NX.O, sq = o.squash || 1, face = o.face || 1;
-        ctx.save(); ctx.translate(x, y); if (o.angle) ctx.rotate(o.angle); ctx.scale(1, sq);
+        let frame = 'idle';
+        if (o.step) frame = o.step > 0 ? 'walk1' : 'walk2';
+        else if (o.squash && o.squash < .985) frame = 'work1';
+        else if (o.squash && o.squash < 1) frame = 'work2';
+        if (o.cheer) frame = 'cheer';
+        const mood = o.mood === 'dizzy' ? 'sad' : o.blink && o.mood === 'neutral' ? 'happy' : o.mood;
+        const img = tinyFigure({ look:o.look, shirt:o.vest, pants:'#2e3a5c', hat:true, hivis:true, frame, mood });
+        ctx.save();
+        ctx.translate(x, y);
+        if (o.angle) ctx.rotate(o.angle);
         if (!o.angle) NX.ell(ctx, 0, -.5, .45, .14, NX.SHADOW);
-        // feet
-        const st = o.step || 0;
-        NX.ell(ctx, -.17, -.44 + Math.max(0, st) * .1, .13, .09, '#3b3f55', O, .05);
-        NX.ell(ctx, .17, -.44 + Math.max(0, -st) * .1, .13, .09, '#3b3f55', O, .05);
-        // body + hi-vis
-        NX.rr(ctx, 0, -.12, .66, .62, .22, o.vest, O, .08);
-        NX.rr(ctx, 0, -.08, .62, .1, 0, '#ffe066', null, 0);
-        NX.circ(ctx, -.37, -.1 + st * .04, .1, skin, O, .05);
-        NX.circ(ctx, .37, -.1 - st * .04, .1, skin, O, .05);
-        if (o.homegrown) { NX.circ(ctx, .18 * face, .04, .08, '#7ed957', O, .03); }
-        // hair behind
-        if (look.style === 2 || look.style === 4) NX.rr(ctx, 0, .48, .9, look.style === 4 ? 1.05 : .75, .35, hair, O, .07);
-        if (look.style === 3) NX.circ(ctx, 0, .98, .17, hair, O, .06);
-        // head
-        NX.circ(ctx, 0, .5, .42, skin, O, .08);
-        NX.ell(ctx, -.25, .4, .08, .05, 'rgba(255,120,150,.6)');
-        NX.ell(ctx, .25, .4, .08, .05, 'rgba(255,120,150,.6)');
-        // eyes
-        const ex = .06 * face, mood = o.mood;
-        if (mood === 'dizzy') { for (const sx of [-.14, .14]) { NX.line(ctx, sx - .07 + ex, .5, sx + .07 + ex, .58, .05, O); NX.line(ctx, sx - .07 + ex, .58, sx + .07 + ex, .5, .05, O); } }
-        else if (o.blink || o.sleepy) { for (const sx of [-.14, .14]) NX.line(ctx, sx - .06 + ex, .52, sx + .06 + ex, .52, .05, O); }
-        else if (mood === 'happy') { for (const sx of [-.14, .14]) { ctx.beginPath(); ctx.arc(sx + ex, .5, .06, 0, Math.PI); ctx.strokeStyle = O; ctx.lineWidth = .05; ctx.stroke(); } }
-        else if (mood === 'shocked') { for (const sx of [-.14, .14]) { NX.circ(ctx, sx + ex, .53, .085, '#ffffff', O, .035); NX.circ(ctx, sx + ex, .53, .035, O); } }
-        else
-        {
-            for (const sx of [-.14, .14]) { NX.ell(ctx, sx + ex, .53, .045, .065, O); NX.circ(ctx, sx + ex + .015, .555, .017, '#ffffff'); }
-            if (mood === 'angry') { NX.line(ctx, -.22 + ex, .66, -.08 + ex, .61, .045, O); NX.line(ctx, .22 + ex, .66, .08 + ex, .61, .045, O); }
-            if (mood === 'sad') { NX.line(ctx, -.22 + ex, .61, -.08 + ex, .66, .04, O); NX.line(ctx, .22 + ex, .61, .08 + ex, .66, .04, O); NX.ell(ctx, .3, .62, .04, .07, '#7cc8ff'); }
-        }
-        // mouth
-        if (mood === 'happy') { ctx.beginPath(); ctx.arc(ex, .38, .09, Math.PI, 0); ctx.closePath(); ctx.fillStyle = '#c2410c'; ctx.fill(); ctx.strokeStyle = O; ctx.lineWidth = .035; ctx.stroke(); }
-        else if (mood === 'shocked' || mood === 'dizzy') NX.ell(ctx, ex, .34, .05, .065, '#7c2d12', O, .03);
-        else if (mood === 'sad' || mood === 'angry') { ctx.beginPath(); ctx.arc(ex, .3, .07, .2 * Math.PI, .8 * Math.PI); ctx.strokeStyle = O; ctx.lineWidth = .04; ctx.stroke(); }
-        else { ctx.beginPath(); ctx.arc(ex, .4, .06, 1.2 * Math.PI, 1.8 * Math.PI); ctx.strokeStyle = O; ctx.lineWidth = .04; ctx.stroke(); }
-        // accessories
-        if (look.acc === 1) for (const sx of [-.14, .14]) NX.circ(ctx, sx + ex, .53, .1, 'rgba(255,255,255,.2)', O, .035);
-        if (look.acc === 2) { ctx.beginPath(); ctx.arc(0, .42, .36, Math.PI * 1.05, Math.PI * 1.95); ctx.lineTo(.2, .28); ctx.lineTo(-.2, .28); ctx.closePath(); ctx.fillStyle = hair; ctx.fill(); ctx.strokeStyle = O; ctx.lineWidth = .04; ctx.stroke(); }
-        if (look.acc === 3) NX.ell(ctx, ex, .43, .12, .035, hair, O, .025);
-        if (look.acc === 4) { NX.rr(ctx, -.43, .52, .1, .22, .05, '#ff4d4d', O, .03); NX.rr(ctx, .43, .52, .1, .22, .05, '#ff4d4d', O, .03); }
-        // hard hat
-        ctx.beginPath(); ctx.arc(0, .66, .38, 0, Math.PI); ctx.closePath(); ctx.fillStyle = hat; ctx.fill(); ctx.strokeStyle = O; ctx.lineWidth = .07; ctx.stroke();
-        NX.rr(ctx, 0, .67, .9, .1, .05, hat, O, .06);
-        ctx.beginPath(); ctx.arc(-.08, .74, .22, Math.PI * .6, Math.PI * .9); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = .06; ctx.stroke();
-        if (look.acc === 5) NX.rr(ctx, 0, .7, .78, .08, .03, '#e11d48', null, 0);
+        ctx.scale(o.face < 0 ? -1 : 1, -1);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, -.56, -1.18, 1.12, 1.68);
+        if (o.homegrown) { ctx.fillStyle = '#7ed957'; ctx.fillRect(.32, -.3, .14, .14); }
         ctx.restore();
     },
 };

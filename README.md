@@ -49,6 +49,19 @@ Smooth hand-offs build a **Flow multiplier** (up to ×2.0) for faster work and b
 
 **Simulate** runs the same model with your assistant in charge. If your crew is weak, tired or demoralised, the assistant advises against it: they catch fewer warnings than you and accident rates rise.
 
+## Pixel art
+
+All the characters and cutscenes are original pixel art, generated in code (`src/pixel.js`) and styled after mid-90s arcade sports games:
+- **Portraits**: hand-shaded busts with dithered lighting, hue-shifted colour ramps and crisp outlines. Expressions include smile, grin, roar, grit, sad and neutral, plus a fist-pump pose. They are built from each person's look, so every crew member, rival and cast member has one.
+- **Floor sprites**: workers are 16×24 sprites with walk, work and cheer frames, hard hats and hi-vis vests.
+- **Cutscenes** (`src/pxscenes.js`): low-res scenes with dithered parallax skies, foliage and skylines, a crowd that claps, cheers or groans, a huge hero bust sliding in, and slammed banded lettering. Scenes include the pre-shift card, the end-of-shift reaction, champions/promotion fireworks, new chapter, and getting fired in the rain.
+- **Lettering**: banded metallic letters with a thick outline and a 5×7 bitmap font for captions.
+- **Manager select**: pick from six default managers, each with stats and perks, or design your own. **Phil Barton** is the bald, smiling Jack of All Trades.
+
+## Legal
+
+© 2026 James Scott. All rights reserved. See `LICENSE`, `NOTICE` (third-party MIT licences) and `privacy.html`. The in-game About & legal screen covers the same ground.
+
 ## Arcade showbiz (inspired by Neo Turf Masters)
 
 - **Pre-shift flyover**: a layered side-scrolling pan across the city to your warehouse, with a "course card" showing the shift number, target, forecast, crew risk, days safe and conditions. Then *READY? … SHIP IT!*
@@ -97,6 +110,9 @@ Cutscenes with characters and branching choices change the game: cash, morale, b
 | `src/data.js` | All content as data: zones, traits, certs, incidents, facilities, tiers, rivals |
 | `src/warehouseMap.js` | Physical floor map: buildings, forklift roads, walkways, zebra crossings, walking graph |
 | `src/legacy.js` | Manager career, job offers, own company, homegrown academy, fatalities, story modifiers |
+| `src/pixel.js` | Pixel portraits, sprites, banded lettering, bitmap font |
+| `src/pxscenes.js` | Pixel cutscene engine and scenes, story backdrops |
+| `src/select.js` | Title screen, manager select, About & legal |
 | `src/spectacle.js` | Callouts, Big Barry, worker barks, grades, coach tips, parallax cutscenes |
 | `src/story.js` | Cutscene engine, cast, scenes and choices, SVG chibi portraits |
 | `src/uiLegacy.js` | Academy creator, customiser, career screen, offers, safety board |

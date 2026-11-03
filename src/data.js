@@ -253,3 +253,30 @@ const OFFER_COMPANIES =
 ];
 
 const FATAL_CAUSES = ['crushed by a falling pallet', 'struck by a reversing forklift', 'caught in a conveyor', 'fell from the racking', 'exposed to a chemical leak'];
+
+// ---------------------------------------------------------------------------
+// Default managers (select screen). Stats are 1-5; perks are permanent multipliers.
+const MANAGER_PRESETS =
+[
+    { id:'phil',    name:'Phil Barton',  title:'JACK OF ALL TRADES', panel:'#4d7f86', shirt:'#e8742a', expr:'smile',
+      look:{ skin:1, hair:7, style:5, hat:0, acc:0 }, stats:{ speed:3, safety:3, money:3, people:3, youth:3 },
+      perks:{ speed:1.03, risk:.97, revenue:1.02, morale:3 }, blurb:'Bald, beaming and unflappable. Phil is decent at absolutely everything and smiles through every crisis.' },
+    { id:'dolores', name:'Dolores Kaye', title:'SAFETY HAWK', panel:'#8a5a3c', shirt:'#22a35a', expr:'grit',
+      look:{ skin:0, hair:7, style:3, hat:0, acc:1 }, stats:{ speed:2, safety:5, money:3, people:3, youth:2 },
+      perks:{ risk:.82, speed:.97 }, blurb:'Thirty years on the floor, zero fatalities. She will find your missing guard rail before you do.' },
+    { id:'marco',   name:'Marco Vance',  title:'SPEED MERCHANT', panel:'#7d7a3a', shirt:'#d94b4b', expr:'grit',
+      look:{ skin:2, hair:0, style:1, hat:0, acc:3 }, stats:{ speed:5, safety:1, money:3, people:2, youth:2 },
+      perks:{ speed:1.07, risk:1.1 }, blurb:'Lives for the UPH board. Brilliant at peak, terrifying the rest of the year.' },
+    { id:'priya',   name:'Priya Nair',   title:'NUMBERS WIZARD', panel:'#6a4a8a', shirt:'#6b4bd9', expr:'neutral',
+      look:{ skin:3, hair:0, style:4, hat:0, acc:0 }, stats:{ speed:3, safety:3, money:5, people:2, youth:2 },
+      perks:{ revenue:1.06, wages:.95 }, blurb:'Can find a penny in a pallet of feathers. Better rates, leaner wage bill.' },
+    { id:'tony',    name:'Tony Okafor',  title:'PEOPLE PERSON', panel:'#4a5a7a', shirt:'#e8b21a', expr:'grin',
+      look:{ skin:5, hair:0, style:0, hat:0, acc:2 }, stats:{ speed:2, safety:3, money:2, people:5, youth:3 },
+      perks:{ morale:10 }, blurb:'Knows every birthday on the floor. Happy crews work harder and stay longer.' },
+    { id:'sam',     name:'Sam Rivera',   title:'TALENT SCOUT', panel:'#7a3a4a', shirt:'#1aa6b8', expr:'neutral',
+      look:{ skin:2, hair:5, style:2, hat:0, acc:4 }, stats:{ speed:2, safety:3, money:2, people:3, youth:5 },
+      perks:{ recruit:.6, train:1.15 }, blurb:'Spots a future 5★ picker at the bus stop. Cheaper academy recruits who grow faster.' },
+    { id:'custom',  name:'You',          title:'CREATE YOUR OWN', panel:'#5a5a5a', shirt:'#38bdf8', expr:'grin',
+      look:null, stats:{ speed:3, safety:3, money:3, people:3, youth:3 }, perks:{}, blurb:'Design your own manager from hard hat to haircut.' },
+];
+const GAME_LEGAL = { title:'Warehouse Manager', version:'Alpha', author:'James Scott', email:'jamscoot22@gmail.com', year:2026, updated:'3 November 2026' };

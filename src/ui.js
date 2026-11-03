@@ -76,27 +76,6 @@ function setMode(m)
 
 // ---------------------------------------------------------------------------
 // Title
-function showTitle()
-{
-    setMode('title');
-    const cont = hasSave();
-    $('#screen').innerHTML = `
-    <div class="title">
-        <div class="logo"><span>📦</span><h1>WAREHOUSE<br>MANAGER</h1><p>Run the floor. Raise your crew. Build an empire.</p></div>
-        <div class="card titleCard">
-            ${cont ? `<button class="big primary" data-act="continue">▶ Continue Career</button><div class="sep">or start again</div>` : ''}
-            <label>Manager name<input id="inName" maxlength="24" value="Alex Morgan"></label>
-            <label>Company name<input id="inCo" maxlength="28" value="Northbridge Logistics"></label>
-            ${titleExtrasHtml()}
-            <button class="big ${cont ? '' : 'primary'}" data-act="newCareer">✚ New Career</button>
-            <div class="zonesStrip">${ZONE_KEYS.map(z => `<span style="background:${ZONE_DEFS[z].hex}" title="${ZONE_DEFS[z].name}">${ZONE_DEFS[z].icon}</span>`).join('')}</div>
-            <p class="small muted">Tip: tap warnings during a shift to prevent accidents. Drag staff between coloured zones to clear bottlenecks.</p>
-            <label class="row"><input type="checkbox" id="optSound" ${wmSettings.sound ? 'checked' : ''}> Sound effects</label>
-        </div>
-        <p class="tiny muted">Built with LittleJS · All companies are fictional</p>
-    </div>`;
-}
-
 // ---------------------------------------------------------------------------
 // Hub
 function showHub(tab)
@@ -974,7 +953,7 @@ function onUiClick(e)
             openModal(`<h2>⚙️ Settings</h2>
                 <label class="row"><input type="checkbox" id="optSound" ${wmSettings.sound ? 'checked' : ''}> Sound effects</label>
                 <p class="small muted">Your career saves automatically after every shift and decision.</p>
-                <div class="btnrow"><button class="danger" data-act="abandon">Abandon career</button><button data-act="closeModal">Close</button></div>`);
+                <div class="btnrow"><button data-act="legal">About &amp; legal</button><button class="danger" data-act="abandon">Abandon career</button><button data-act="closeModal">Close</button></div>`);
             break;
         case 'abandon':
             if (a.dataset.confirm) { deleteSave(); career = null; closeModal(); showTitle(); }

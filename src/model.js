@@ -512,7 +512,7 @@ function endWeek()
     const L = c.weekLedger;
     const summary = { week: c.week, lines: [] };
     // wages & maintenance
-    L.wages = c.staff.reduce((a, s)=> a + s.wage, 0);
+    L.wages = Math.round(c.staff.reduce((a, s)=> a + s.wage, 0) * (c.manager.perks?.wages ?? 1));
     L.maintenance = Object.entries(c.facilities).reduce((a, [k, v])=> a + v * (k === 'automation' ? 600 : 110), 0);
     c.cash -= L.wages + L.maintenance;
     const profit = L.revenue - L.penalties - L.fines - L.energy - L.overtime - L.other - L.wages - L.maintenance;
@@ -531,7 +531,7 @@ function endWeek()
         const ageF = s.age < 24 ? 1.4 : s.age < 30 ? 1.1 : s.age < 40 ? .8 : s.age < 50 ? .5 : .25;
         let f = .55 * ageF * (1 + c.facilities.training * .12) * traitMod(s, 'train') * (s.hidden.professionalism / 14);
         if (mentors.length && s.age < 26 && !mentors.includes(s)) f *= 1.3;
-        if (s.homegrown) f *= HOMEGROWN_TRAIN_MUL;
+        if (s.homegrown) f *= HOMEGROWN_TRAIN_MUL * (c.manager.perks?.train ?? 1);
         const gap = s.hidden.potential - staffAbility(s);
         if (gap <= 0) f *= .12;
         if (s.injury) f *= .2;
@@ -566,7 +566,7 @@ function endWeek()
         // weekend recovery
         s.condition = clamp(s.condition + 35 + c.facilities.breakroom * 3, 0, 100);
         // weekly morale baseline
-        let dm = (c.facilities.breakroom - 2) * .8 + traitMod(s, 'morale', 0);
+        let dm = (c.facilities.breakroom - 2) * .8 + traitMod(s, 'morale', 0) + (c.manager.perks?.morale || 0) * .25;
         if (s.wage < fairWage(staffAbility(s)) * .85) dm -= 2;
         if (pos <= 3) dm += 1; else if (pos >= 7) dm -= 1;
         if (s.promisedRaise && wmChance(.3)) { dm -= 6; s.promisedRaise = false; pushMsg('staff', `😠 ${s.name} feels let down`, `${s.name} says the promised pay rise never came.`); }
