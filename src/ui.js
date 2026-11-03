@@ -70,6 +70,7 @@ function setMode(m)
     if (m !== 'shift') $('#workerCard').classList.add('hidden');
     $('#toasts').innerHTML = '';
     setInputPreventDefault(m === 'shift');
+    if (m !== 'shift') document.body.classList.remove('finalHour');
     document.body.classList.toggle('inShift', m === 'shift');
 }
 
@@ -548,10 +549,13 @@ function startShift(skipStory = false)
     const sid = !skipStory && storyNext('preShift');
     if (sid) return playStory(sid, ()=> startShift(true));
     wmSim = new ShiftSim(career, { simulated:false });
-    setMode('shift');
-    buildHud();
-    shiftView.start(wmSim);
-    hudToast(`Shift started — target ${fmtUnits(wmSim.forecast.target)} units. Drag workers to rebalance!`, '#38bdf8');
+    sceneShiftIntro(wmSim, ()=>
+    {
+        setMode('shift');
+        buildHud();
+        shiftView.start(wmSim);
+        coachTip('start');
+    });
 }
 function simulateShift(skipStory = false)
 {
@@ -565,7 +569,7 @@ function simulateShift(skipStory = false)
 function hudShiftFinished()
 {
     if (wmMode !== 'shift') return;
-    setTimeout(finishShift, 900);
+    setTimeout(finishShift, 1900);
 }
 function finishShift()
 {
@@ -589,7 +593,7 @@ function finishShift()
             if (se.offers?.length) wmPendingFlow.push({ kind:'offers', reason:'season' });
         }
     }
-    showReport(res);
+    sceneShiftEnd(res, ()=> showReport(res));
 }
 function continueFlow()
 {
@@ -719,7 +723,7 @@ function showReport(res, replay = false)
         : r.csat > .95 ? 'Superb — customers and board alike are delighted.' : 'A solid shift. The board is satisfied.';
     $('#screen').innerHTML = `
     <div class="hub report">
-        <header class="top"><div class="co"><b>Post-shift report</b><span>${r.simulated ? '⏩ Simulated · ' : ''}${r.overtimeHours ? `⏱️ ${r.overtimeHours}h overtime · ` : ''}${esc(quip)}</span></div></header>
+        <header class="top"><div class="gradeBadge g${shiftGrade(r)}">${shiftGrade(r)}</div><div class="co"><b>Post-shift report</b><span>${r.simulated ? '⏩ Simulated · ' : ''}${r.overtimeHours ? `⏱️ ${r.overtimeHours}h overtime · ` : ''}${esc(quip)}</span></div></header>
         <div class="grid">
             <section class="card hero">
                 <div class="big3">
@@ -795,6 +799,7 @@ function showWeekSummary(w)
     const part = (l, v)=> `<div class="lline"><span>${l}</span><b class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</b></div>`;
     openModal(`
         <h2>📊 Week ${w.week} review</h2>
+        <div class="barry">📢 <b>BARRY:</b> ${b.delta >= 4 ? 'The suits upstairs are SMILING. I didn\'t know they could do that.' : b.delta >= 0 ? 'Steady week. The board nods approvingly. Probably.' : b.delta > -6 ? 'Board\'s frowning. Let\'s give them something to smile about.' : 'Uh-oh. I heard the words "performance review" in the lift.'}</div>
         <div class="mini4">
             <div><small>Avg shipped</small><b>${fmtUnits(b.avgShipped)}</b></div>
             <div><small>Target</small><b>${fmtUnits(b.target)}</b></div>
@@ -810,9 +815,10 @@ function showWeekSummary(w)
     playSfx(b.delta >= 0 ? 'saved' : 'flowDown', .7);
 }
 
-function showSeasonEnd(s)
+function showSeasonEnd(s, skipScene = false)
 {
     if (s.sacked) { career.board.sacked = true; saveCareer(); return showGameOver(s); }
+    if (!skipScene && (s.promoted || s.position === 1)) return sceneTrophy(s.position === 1 ? 'champion' : 'promotion', s, ()=> showSeasonEnd(s, true));
     openModal(`
         <h2>🏁 Season ${s.season} complete</h2>
         <p class="bigline">You finished <b>${ordinal(s.position)}</b> of 8.</p>
@@ -827,6 +833,7 @@ function showSeasonEnd(s)
 function showGameOver(s)
 {
     closeModal();
+    if (!career.flags.sackScene) { career.flags.sackScene = true; setMode('gameover'); $('#screen').innerHTML = ''; return sceneSacked(()=> showGameOver(s)); }
     if (!career.flags.bankrupt && !career.flags.offeredAfterSack)
     {
         career.flags.offeredAfterSack = true;

@@ -319,9 +319,11 @@ WM_ACTIONS.moveGo = (a)=>
     career.board.sacked = false;
     saveCareer();
     closeModal();
-    wmPendingFlow = career.pendingMilestones.map(m => ({ kind:'cine', m }));
+    wmPendingFlow = career.pendingMilestones.filter(m => !['newJob', 'ownCompany'].includes(m.key)).map(m => ({ kind:'cine', m }));
     career.pendingMilestones = [];
-    continueFlow();
+    career.flags.sackScene = false; career.flags.offeredAfterSack = false;
+    setMode('hub'); $('#screen').innerHTML = '';
+    sceneNewChapter(()=> continueFlow());
 };
 WM_ACTIONS.offersDecline = ()=> { career.offers = []; career.manager.rep = clamp(career.manager.rep + 1, 0, 100); if (!career.manager.owner) career.board.confidence = clamp(career.board.confidence + 6, 0, 100); saveCareer(); continueFlow(); };
 

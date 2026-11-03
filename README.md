@@ -49,6 +49,17 @@ Smooth hand-offs build a **Flow multiplier** (up to ×2.0) for faster work and b
 
 **Simulate** runs the same model with your assistant in charge. If your crew is weak, tired or demoralised, the assistant advises against it: they catch fewer warnings than you and accident rates rise.
 
+## Arcade showbiz (inspired by Neo Turf Masters)
+
+- **Pre-shift flyover**: a layered side-scrolling pan across the city to your warehouse, with a "course card" showing the shift number, target, forecast, crew risk, days safe and conditions. Then *READY? … SHIP IT!*
+- **Announcer callouts**: big slammed italic lettering with a shine sweep for the moments that matter. NICE / GREAT / SUPER / MAX FLOW, **TARGET SMASHED!** (with slow-mo and confetti), FINAL HOUR!, NICE SAVE!, EMERGENCY STOP!, MAN DOWN!, JAMMED!, OVERTIME!, SHIFT OVER!
+- **End-of-shift grade**: sunset flyover with trucks rolling out, a stamped S–F grade, the Worker of the Shift card, and a verdict from **Big Barry**, the tannoy announcer. A fatal shift gets a candle and a darker scene.
+- **Big Barry** has opinions on peak weeks, ropey crews, your homegrown kids and the board.
+- **Crew voices**: workers bark in speech bubbles ("On it!", "Forklift schmorklift!", "I need a brew…"), flavoured by their traits (Speed Demons, Lazy, Professional, Mentors, homegrown kids…).
+- **Trophy, new-chapter and sacking cutscenes**: fireworks over your warehouse when you're crowned champions or promoted, a drive-in to your new site with your followers, and a rainy walk-out with a box of belongings.
+- **Coach Gus** pops up with one-time tips during your first season.
+- **Final-hour tension**: the clock throbs and the ambient rumble rises.
+
 ## Danger
 
 Accidents are brutal. Teetering box stacks crush people, forklifts send jaywalkers flying, and serious incidents can be **fatal**. A fatality freezes the floor, removes the worker for good, and brings a $20k–50k fine. The crew is devastated, the board loses faith, your reputation takes a hit, and their name goes on the **Memorial wall**. A **DAYS WITHOUT AN ACCIDENT** board sits on the shift HUD and the hub header. It flips back to 00 the moment someone gets hurt.
@@ -86,6 +97,7 @@ Cutscenes with characters and branching choices change the game: cash, morale, b
 | `src/data.js` | All content as data: zones, traits, certs, incidents, facilities, tiers, rivals |
 | `src/warehouseMap.js` | Physical floor map: buildings, forklift roads, walkways, zebra crossings, walking graph |
 | `src/legacy.js` | Manager career, job offers, own company, homegrown academy, fatalities, story modifiers |
+| `src/spectacle.js` | Callouts, Big Barry, worker barks, grades, coach tips, parallax cutscenes |
 | `src/story.js` | Cutscene engine, cast, scenes and choices, SVG chibi portraits |
 | `src/uiLegacy.js` | Academy creator, customiser, career screen, offers, safety board |
 | `src/model.js` | Career rules: staff generation, lineup, contracts, training, transfers, league, board, save/load |

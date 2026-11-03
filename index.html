@@ -319,6 +319,111 @@ body.inShift .toast{font-size:13.5px;padding:4px 10px}
 #story .chip{min-width:0;padding:3px 10px;border-radius:12px;font-size:13.5px;box-shadow:0 3px 0 var(--ink)}
 #story .chip.good{background:#d7f8c9}#story .chip.bad{background:#ffd6d6}
 @media (max-width:640px){#story .actor .ava{width:110px;height:110px}#story .actor{bottom:auto;top:calc(9vh + 16px)}#story .actor.right{top:calc(9vh + 60px)}#story .txt{font-size:16px}}
+
+/* ===== spectacle: parallax flyovers ===== */
+#parallax{position:fixed;inset:0;z-index:45;overflow:hidden;cursor:pointer;opacity:0;transition:opacity .3s}
+#parallax.run{opacity:1}#parallax.out{opacity:0}
+#parallax.sky-dawn{background:linear-gradient(180deg,#7ec8ff 0%,#ffc4a8 55%,#ffe7a3 75%)}
+#parallax.sky-day{background:linear-gradient(180deg,#4fb4ff,#bfe6ff 70%)}
+#parallax.sky-sunset{background:linear-gradient(180deg,#5b4fc4 0%,#ff7b9c 45%,#ffb347 75%)}
+#parallax.sky-night{background:linear-gradient(180deg,#0b0f2a,#2c2a6b 70%)}
+#parallax.sky-rain{background:linear-gradient(180deg,#5d6680,#9aa3b6 70%)}
+.pxSun{position:absolute;width:26vmin;height:26vmin;border-radius:50%;right:12vw;top:12vh;background:radial-gradient(circle,#fff6c2,#ffd23f 60%,rgba(255,210,63,0) 72%);animation:sunRise 4.5s ease-out both}
+.sky-night .pxSun{background:radial-gradient(circle,#ffffff,#e7ecff 55%,rgba(231,236,255,0) 70%);width:14vmin;height:14vmin}
+.sky-rain .pxSun{display:none}
+@keyframes sunRise{from{transform:translateY(18vh)}}
+.pxl{position:absolute;left:0;top:0;height:100%;animation:pxPan var(--dur) cubic-bezier(.25,.1,.25,1) both}
+.pxl svg{display:block}
+@keyframes pxPan{from{transform:translateX(0)}to{transform:translateX(var(--travel))}}
+.pxl.clouds{animation-timing-function:linear}
+.pxl.grow svg{transform-origin:50% 100%;animation:growUp 1.4s .3s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes growUp{from{transform:scaleY(.2)}}
+.pxl.trucks{animation-timing-function:ease-in}
+.pxFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;animation:flash .5s ease-out both}
+@keyframes flash{0%{opacity:.9}100%{opacity:0}}
+.pxCard{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;padding:12px}
+.pxCard.left{align-items:flex-start;padding-left:5vw}
+.pxCard.ctop{justify-content:flex-start;padding-top:5vh}
+.pxCard.ctop .trophyCard{background:rgba(255,253,245,.9)}
+.pxCard.ctop .bigTrophy{font-size:70px}
+@media (max-width:640px){.pxCard.left{align-items:center;padding-left:12px}.pxCard.left .holeCard,.pxCard.left .trophyCard{margin-bottom:22vh}}
+.pxSkip{position:absolute;right:14px;bottom:14px;background:rgba(43,45,66,.75);color:#fff;border-radius:12px;padding:4px 10px;font-size:13px;animation:blink 1.4s infinite}
+.barry{margin-top:10px;background:#fff;border:3px solid var(--ink);border-radius:14px;padding:6px 12px;font-size:15px;box-shadow:0 4px 0 var(--ink);max-width:560px}
+/* "course card" before a shift */
+.holeCard{width:min(520px,92vw);background:linear-gradient(180deg,rgba(20,24,52,.92),rgba(43,45,66,.92));color:#fff;border:4px solid #ffd23f;border-radius:22px;padding:14px 18px;box-shadow:0 8px 0 var(--ink),0 0 0 4px var(--ink);animation:cardSlide .6s .5s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes cardSlide{from{transform:translateX(-120vw) skewX(-12deg)}}
+.hcTop{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:2px dashed rgba(255,210,63,.5);padding-bottom:6px}
+.hcNo{font-size:30px;font-weight:700;font-style:italic;color:#ffd23f;-webkit-text-stroke:1.5px var(--ink);text-shadow:0 3px 0 var(--ink)}
+.hcDay{font-size:13px;opacity:.85}
+.hcBig{text-align:center;margin:6px 0}
+.hcBig small{display:block;font-size:12px;letter-spacing:.2em;opacity:.8}
+.hcBig b{font-size:54px;line-height:1;color:#fff;-webkit-text-stroke:2px var(--ink);text-shadow:0 5px 0 #ff8a1f}
+.hcRows{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:14px}
+.hcRows div{display:flex;justify-content:space-between;background:rgba(255,255,255,.08);border-radius:8px;padding:2px 8px}
+.hcCond{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.hcCond span{background:#ffd23f;color:var(--ink);border-radius:10px;padding:1px 8px;font-size:12.5px}
+.holeCard .barry{color:var(--ink);font-size:14px}
+.pxReady{position:absolute;bottom:16vh;left:0;right:0;text-align:center;font-weight:900;font-style:italic;pointer-events:none}
+.pxReady span{position:absolute;left:0;right:0;font-size:clamp(46px,11vw,110px);color:#ffd23f;-webkit-text-stroke:4px var(--ink);paint-order:stroke fill;text-shadow:0 7px 0 var(--ink);opacity:0}
+.pxReady .r1{animation:readyIn .7s 2.6s both}
+.pxReady .r2{animation:goIn .8s 3.4s both;color:#7ee36b}
+@keyframes readyIn{0%{opacity:0;transform:scale(2.4)}30%{opacity:1;transform:scale(.95)}70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.1)}}
+@keyframes goIn{0%{opacity:0;transform:scale(3) rotate(-8deg)}35%{opacity:1;transform:scale(.9) rotate(2deg)}100%{opacity:1;transform:scale(1.05)}}
+/* end-of-shift grade */
+.endCard,.trophyCard{width:min(560px,94vw);text-align:center;background:rgba(255,253,245,.95);border:4px solid var(--ink);border-radius:26px;padding:14px 16px 16px;box-shadow:0 10px 0 var(--ink);animation:pop .55s .35s cubic-bezier(.2,1.6,.4,1) both}
+.endCard.dark,.trophyCard.dark{background:rgba(30,33,52,.93);color:#e6e9f5}
+.grade{font-size:120px;line-height:.9;font-weight:900;font-style:italic;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-shadow:0 8px 0 var(--ink);animation:gradeSlam .7s .7s cubic-bezier(.2,1.8,.4,1) both;display:inline-block}
+@keyframes gradeSlam{0%{transform:scale(4) rotate(-25deg);opacity:0}60%{transform:scale(.85) rotate(4deg);opacity:1}100%{transform:none}}
+.gS{color:#ff5d8f;animation:gradeSlam .7s .7s cubic-bezier(.2,1.8,.4,1) both,hue 1.2s linear infinite}
+@keyframes hue{to{filter:hue-rotate(360deg)}}
+.grade.candle{-webkit-text-stroke:0;text-shadow:none;font-size:90px;animation:cineIn 1.2s .5s both}
+.gA{color:#ffd23f}.gB{color:#7ee36b}.gC{color:#5fd1ff}.gD{color:#c38bff}.gF{color:#ff5a5a}
+.endTitle{font-size:clamp(28px,6vw,44px);font-weight:900;font-style:italic;color:#fff;-webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill;text-shadow:0 5px 0 var(--ink);animation:cineUp .6s 1s both}
+.endTitle.red{color:#ff5a5a}
+.endStats{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:8px 0;animation:cineUp .5s 1.2s both}
+.endStats span{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:12px;padding:2px 9px;font-size:14px}
+.mvp{display:flex;gap:12px;align-items:center;justify-content:center;margin:8px auto;background:linear-gradient(90deg,#fff1a8,#ffe0f0);color:var(--ink);border:3px solid var(--ink);border-radius:18px;padding:6px 14px;width:fit-content;animation:mvpIn .6s 1.5s cubic-bezier(.2,1.5,.4,1) both;text-align:left}
+.mvp small{display:block;font-size:11px;letter-spacing:.12em;color:#b45309}
+.mvp b{font-size:20px;margin-right:6px}
+.mvp em{font-style:normal;font-size:12px}
+.mvpAva .ava{border:3px solid var(--ink);border-radius:50%;background:#fff}
+@keyframes mvpIn{from{transform:translateX(60vw) rotate(8deg);opacity:0}}
+.endCard .barry,.trophyCard .barry{animation:cineUp .5s 1.8s both;margin:10px auto 0;color:var(--ink)}
+/* trophy / chapter scenes */
+.bigTrophy{font-size:110px;line-height:1;animation:cineIn 1s .3s cubic-bezier(.2,1.8,.4,1) both,bob 1.8s 1.3s infinite;filter:drop-shadow(0 8px 0 rgba(43,45,66,.4))}
+.crewRow{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.crewMember{display:flex;flex-direction:column;align-items:center;animation:crewHop .6s cubic-bezier(.2,1.6,.4,1) both, hop 1s 1.2s ease-in-out infinite}
+.crewMember .ava{border:3px solid var(--ink);border-radius:50%;background:#fff}
+.crewMember small{font-size:12px;font-weight:700}
+@keyframes crewHop{from{transform:translateY(80px) scale(.4);opacity:0}}
+@keyframes hop{50%{transform:translateY(-10px)}}
+.sadMgr{position:relative;display:inline-block;animation:walkOff 5s linear both}
+.sadMgr .ava{border:3px solid var(--ink);border-radius:50%;background:#cfd6e4}
+.boxOfStuff{position:absolute;right:-24px;bottom:-6px;font-size:46px}
+@keyframes walkOff{from{transform:translateX(-30vw)}to{transform:translateX(10vw)}}
+.fw{position:absolute;width:12px;height:12px;border-radius:50%;opacity:0;animation:fw 1.6s ease-out infinite}
+.fw::before{content:'';position:absolute;inset:-70px;border-radius:50%;background:radial-gradient(circle,transparent 30%,currentColor 32%,transparent 36%),conic-gradient(from 0deg,transparent 0 5%,currentColor 5% 7%,transparent 7% 17%,currentColor 17% 19%,transparent 19% 30%,currentColor 30% 32%,transparent 32% 45%,currentColor 45% 47%,transparent 47% 60%,currentColor 60% 62%,transparent 62% 75%,currentColor 75% 77%,transparent 77% 90%,currentColor 90% 92%,transparent 92%);-webkit-mask:radial-gradient(circle,transparent 20%,#000 22%,#000 70%,transparent 72%)}
+.f1{left:18%;top:20%;color:#ffd23f}.f2{left:72%;top:16%;color:#ff5d8f;animation-delay:.4s}.f3{left:45%;top:10%;color:#7ee36b;animation-delay:.8s}.f4{left:85%;top:34%;color:#5fd1ff;animation-delay:1.2s}
+@keyframes fw{0%{opacity:0;transform:scale(.1)}15%{opacity:1}100%{opacity:0;transform:scale(1.2)}}
+.rainfx{position:absolute;inset:-20%;background:repeating-linear-gradient(105deg,transparent 0 14px,rgba(255,255,255,.35) 14px 16px);animation:rain .45s linear infinite;pointer-events:none}
+@keyframes rain{to{transform:translate(-30px,60px)}}
+/* report grade badge */
+.gradeBadge{font-size:44px;line-height:1;font-weight:900;font-style:italic;-webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill;text-shadow:0 4px 0 var(--ink);padding:0 6px}
+/* coach Gus */
+#coach{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));transform:translate(-50%,160%);display:flex;gap:10px;align-items:center;width:min(520px,94vw);background:#fffdf5;border:3px solid var(--ink);border-radius:20px;padding:8px 12px;box-shadow:0 6px 0 var(--ink);z-index:16;transition:transform .45s cubic-bezier(.2,1.5,.4,1);cursor:pointer}
+#coach{opacity:0;pointer-events:none}
+#coach.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+#coach .ava{flex:0 0 auto;border:3px solid var(--ink);border-radius:50%;background:#d6f1ff}
+#coach p{margin:2px 0 0;font-size:14px;font-weight:500}
+@media (max-width:760px){#coach{bottom:calc(112px + env(safe-area-inset-bottom))}}
+/* final hour tension */
+body.finalHour .clock{background:#ffe1e1;animation:tense 1s ease-in-out infinite}
+@keyframes tense{50%{transform:scale(1.07);box-shadow:0 4px 0 var(--ink),0 0 0 6px rgba(255,90,90,.35)}}
+/* milestone cinematic: sunburst + ribbon */
+#cine::before{content:'';position:absolute;inset:-50%;background:repeating-conic-gradient(rgba(255,255,255,.35) 0 10deg,transparent 10deg 20deg);animation:spin 12s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cineBox{position:relative}
+.cineBox h1{background:#ff5d8f;-webkit-text-stroke:0;color:#fff;text-shadow:0 4px 0 var(--ink);border:4px solid var(--ink);border-radius:14px;padding:4px 26px;display:inline-block;box-shadow:0 6px 0 var(--ink);transform:rotate(-2deg)}
 </style>
 </head><body>
 <script src=dist/littlejs.js></script>
@@ -330,6 +435,7 @@ body.inShift .toast{font-size:13.5px;padding:4px 10px}
 <script src=src/shiftSim.js></script>
 <script src=src/floor.js></script>
 <script src=src/story.js></script>
+<script src=src/spectacle.js></script>
 <script src=src/ui.js></script>
 <script src=src/uiLegacy.js></script>
 <script src=game.js></script>

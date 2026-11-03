@@ -134,6 +134,16 @@ const shiftView =
         this.bodies = [];
         this.drops = [];
         this.drama = null;
+        this.barks = [];
+        this.lastBark = 0;
+        this.slowmo = 0;
+        this.stepAcc = 0;
+        this.targetHit = false;
+        this.finalHour = false;
+        this.flowAnnounced = 1;
+        this.calloutGate = {};
+        this.chatterT = 8;
+        wmCallouts.queue = []; wmCallouts.cur = null;
         this.iconQueue = [];
         for (const k in this.sparks) this.sparks[k]?.destroy();
         this.sparks = {};
@@ -232,6 +242,7 @@ const shiftView =
                 if (!fast) playSfx('scan', 1, 1 + (d.w.id % 5) * .03, .07);
                 if (d.smooth && this.sim.stats.combo % 11 === 0 && this.sim.stats.combo > 0)
                 {
+                    if (Math.random() < .35) this.bark(d.w, 'perfect');
                     this.bubble('Perfect hand-off!', p.add(vec2(0, 1.3)), '#7dd3fc', .45);
                     playSfx('perfect', .8, 1, .3);
                     wmBurst('sparkle', p.add(vec2(0, .5)), { scale:.6 });
@@ -256,6 +267,16 @@ const shiftView =
                 if (d.p.type === 'rush') this.bubble(this.sim.t > d.p.due ? 'Rush LATE' : 'Rush on time! +$', p.add(vec2(0, 1.2)), this.sim.t > d.p.due ? '#f87171' : '#facc15', .45);
                 else if (this.sim.stats.shipped % 5 === 0) this.bubble('+' + (5 * UNITS_PER_PARCEL), R.bay.pos.add(vec2(0, 2.2)), '#86efac', .5, 1);
                 const sh = this.sim.stats.shipped;
+                if (!this.targetHit && sh >= this.sim.forecast.target)
+                {
+                    this.targetHit = true;
+                    this.slowmo = 1.4;
+                    callout('TARGET SMASHED!', 'rainbow', { sub:`${fmtUnits(sh)} units — and the clock is still running!`, hold:1.6, size:1.05 });
+                    playSfx('fanfare', 1, 1.1);
+                    for (const z of ['blue', 'yellow', 'red']) particleEffect('confetti', R[z].pos.add(vec2(0, 2)), { scale:2 });
+                    for (const w of this.sim.workers) { const v = this.vis[w.id]; if (v) v.hop = .25; }
+                    this.lastBark = 0; this.bark(pickOne(this.sim.workers.filter(w => !w.injured)), 'target');
+                }
                 if (sh > 0 && sh % 100 === 0)
                 {
                     this.bubble(`${sh * UNITS_PER_PARCEL} units shipped!`, R.red.pos.add(vec2(0, 1.5)), '#fde047', .7, 2);
@@ -284,6 +305,9 @@ const shiftView =
             {
                 const r = R[d.z];
                 this.bubble('BOTTLENECK!', r.pos.add(vec2(0, r.size.y/2 - .9)), '#f97316', .6, 1.5);
+                if (this.gate('jam', 25)) callout('JAMMED!', 'blue', { sub:`${ZONE_DEFS[d.z].name} is full — send help!`, size:.8, hold:.8 });
+                coachTip('bottleneck');
+                this.bark(pickOne(this.sim.zoneWorkers(d.z)) || null, 'jam');
                 this.zoneGlow[d.z] = { t:1.2, c:'#f97316' };
                 playSfx('buzz', .7, 1, .4);
                 break;
@@ -291,14 +315,20 @@ const shiftView =
             case 'flowUp':
             {
                 const c = this.bounds.center;
-                this.bubble(`FLOW x${(1 + (d.level - 1) * .25).toFixed(2)}`, c.add(vec2(0, 2)), '#38bdf8', .9, 1.8);
                 particleEffect('confetti', c.add(vec2(0, 3)), { scale: 1 + d.level * .3 });
-                playSfx('flowUp', .8, 1 + d.level * .06);
-                hudToast(`🌊 Flow level ${d.level}!`, '#38bdf8');
+                if (d.level > this.flowAnnounced)
+                {
+                    this.flowAnnounced = d.level;
+                    const calls = { 2:['NICE FLOW!', 'blue'], 3:['GREAT FLOW!', 'green'], 4:['SUPER FLOW!!', 'gold'], 5:['MAX FLOW!!!', 'rainbow'] };
+                    const [txt, st] = calls[d.level] || calls[2];
+                    callout(txt, st, { sub:`Speed x${(1 + (d.level - 1) * .04).toFixed(2)} · keep the hand-offs smooth`, size: d.level >= 5 ? 1.1 : .9 });
+                }
+                else playSfx('flowUp', .5, 1 + d.level * .06);
                 break;
             }
             case 'flowDown':
                 playSfx('flowDown', .5, 1, .8);
+                if (d.level <= 1) this.flowAnnounced = 1;
                 break;
             case 'incident':
             {
@@ -308,6 +338,7 @@ const shiftView =
                 playSfx('warn', .9);
                 if (d.inc.type === 'strike') { playSfx('horn', 1, 1.6); addScreenShake(.15, .3); this.vignette = Math.max(this.vignette, .5); }
                 playSfx('ominous', .6);
+                coachTip('incident');
                 if (!this.sim.assistantOn) hudToast(d.inc.type === 'strike' ? `🚜 ${d.w.s.name} is in the forklift lane — TAP to stop the forklift!` : `⚠️ ${def.label} — ${ZONE_DEFS[d.inc.zone].name}! Tap the warning!`, d.inc.type === 'strike' ? '#ef4444' : '#facc15');
                 break;
             }
@@ -318,6 +349,8 @@ const shiftView =
                 this.bubble('Safety Risk -8', p.add(vec2(0, 1)), '#86efac', .38, 1.4);
                 wmBurst('heal', p.add(vec2(0, .6)), { scale:.8 });
                 playSfx('saved', .9);
+                if (!this.sim.assistantOn && this.gate('save', 5)) callout(d.inc.type === 'strike' ? 'EMERGENCY STOP!' : pickOne(['NICE SAVE!', 'GREAT CATCH!', 'NOT TODAY!']), 'green', { size:.85, hold:.7 });
+                if (d.w) { this.lastBark = 0; this.bark(d.w, 'saved'); }
                 break;
             }
             case 'nearMiss':
@@ -325,6 +358,7 @@ const shiftView =
                 const p = this.workerPos(d.w);
                 if (d.inc.type === 'falling') this.drops.push({ kind:'box', from:p.add(vec2(.9, 4)), to:p.add(vec2(1, -.1)), t:0, dur:.45, spin:1, hit:false, onLand:()=> { particleEffect('dust', p.add(vec2(1, 0)), { scale:.8 }); playSfx('crash', .5, 1.4); addScreenShake(.12, .2); } });
                 this.bubble('Near miss… lucky', p.add(vec2(0, 1.5)), '#fde68a', .45, 1.5);
+                this.lastBark = 0; this.bark(d.w, 'nearMiss');
                 playSfx('glass', .4, .8);
                 break;
             }
@@ -343,6 +377,8 @@ const shiftView =
                 playSfx('glass', .8);
                 playSfx('ominous', 1);
                 if (!inj.fatal) hudToast(`🚑 ${d.w.s.name} injured (${inj.label})`, '#ef4444');
+                if (inj.serious && !inj.fatal) { callout('MAN DOWN!', 'red', { sub:`${d.w.s.name} — ${inj.label}`, hold:1.2 }); this.slowmo = .8; }
+                { const mate = this.sim.workers.find(o => o !== d.w && !o.injured && o.zone === d.w.zone); this.lastBark = 0; this.bark(mate, 'injury'); }
                 if (this.selected === d.w.id) this.select(null);
                 break;
             }
@@ -353,6 +389,7 @@ const shiftView =
                 this.sparks[d.z]?.destroy();
                 this.sparks[d.z] = particleEffect('sparks', r.pos.add(vec2(r.size.x/2 - 1.2, r.size.y/2 - 1)), { scale:.5 });
                 playSfx('clank', .9); playSfx('buzz', .6);
+                coachTip('breakdown');
                 hudToast(`${d.def.icon} ${d.def.label} in ${ZONE_DEFS[d.z].name}` + (this.sim.crewCount('black') ? ' — maintenance dispatched' : ' — tap it to call a contractor'), '#fb923c');
                 break;
             }
@@ -376,15 +413,18 @@ const shiftView =
                 break;
             case 'tired':
                 this.bubble('Exhausted 😩', this.workerPos(d.w).add(vec2(0, 1.4)), '#fcd34d', .38, 1.6);
+                this.bark(d.w, 'tired'); coachTip('tired');
                 if (!this.sim.assistantOn) hudToast(`😩 ${d.w.s.name} is exhausted — drag them to the Break Room`, '#fcd34d');
                 break;
             case 'move':
+                if (!this.sim.assistantOn) this.bark(d.w, 'moved');
                 break;
             case 'waitCross':
-                if (!fast && Math.random() < .35) this.bubble('Waiting for forklift…', this.workerPos(d.w).add(vec2(0, 1.6)), '#fde68a', .32, 1.2);
+                if (!fast && Math.random() < .3) this.bark(d.w, 'wait', true);
                 break;
             case 'jaywalk':
                 this.bubble('JAYWALKING! 🏃', this.workerPos(d.w).add(vec2(0, 1.7)), '#f87171', .5, 1.6);
+                this.lastBark = 0; this.bark(d.w, 'jaywalk'); coachTip('jaywalk');
                 playSfx('buzz', .8, 1.4);
                 if (!this.sim.assistantOn) hudToast(`🏃 ${d.w.s.name} got impatient and ran across the forklift road!`, '#f87171');
                 break;
@@ -398,7 +438,7 @@ const shiftView =
                 break;
             }
             case 'breakTime':
-                if (!fast && Math.random() < .5) this.bubble('Meal break 🍔', this.workerPos(d.w).add(vec2(0, 1.4)), '#e2e8f0', .32, 1.2);
+                if (!fast && Math.random() < .4) this.bark(d.w, 'breakTime', true);
                 break;
             case 'arrive':
             {
@@ -413,13 +453,18 @@ const shiftView =
             }
             case 'hour':
             {
-                const uph = this.sim.unitsPerHour();
-                hudToast(`🕐 ${String(d.hour).padStart(2,'0')}:00 — ${uph} UPH`, '#cbd5e1');
                 playSfx('tick', 1);
+                if (d.hour === SHIFT_START_HOUR + 7 && !this.finalHour)
+                {
+                    this.finalHour = true;
+                    const need = Math.max(0, this.sim.forecast.target - this.sim.stats.shipped);
+                    callout('FINAL HOUR!', 'gold', { sub: need ? `${fmtUnits(need)} units to target — dig deep!` : 'Target in the bag. Bring it home clean!' });
+                    document.body.classList.add('finalHour');
+                }
                 break;
             }
             case 'overtime':
-                hudToast(`⏱️ Overtime called (+${d.hours}h) — 1.5x wages, tired crew`, '#c084fc');
+                callout('OVERTIME!', 'purple', { sub:`+${d.hours}h · 1.5x wages · tired crew`, size:.85 });
                 playSfx('horn', .5, 1.5);
                 break;
             case 'finish':
@@ -427,6 +472,19 @@ const shiftView =
                 break;
         }
     },
+
+    bark(w, kind, quiet = false)
+    {
+        if (!w || w.injured) return;
+        const now = timeReal;
+        if (now - this.lastBark < (quiet ? 2.5 : .9) || this.barks.some(b => b.id === w.id)) return;
+        const text = barkLine(kind, w.s);
+        if (!text) return;
+        this.lastBark = now;
+        this.barks.push({ id:w.id, text, t:0, life:2.2 });
+        if (!quiet) playSfx('tick', .6, 1.6 + Math.random() * .4);
+    },
+    gate(key, secs) { const now = timeReal; if (now - (this.calloutGate[key] || -99) < secs) return false; this.calloutGate[key] = now; return true; },
 
     injuryAnim(w, inj, inc, p)
     {
@@ -485,12 +543,22 @@ const shiftView =
         for (const bd of this.bodies) if (!bd.fatal) bd.life -= dtReal / 4;
         this.bodies = this.bodies.filter(bd => bd.fatal || bd.life > 0);
         // simulate
+        calloutUpdate(dtReal);
+        if (this.slowmo > 0) this.slowmo -= dtReal;
         if (!this.paused && !this.sim.done && !this.drama)
         {
-            const steps = this.speed;
-            for (let i = 0; i < steps && !this.sim.done; i++) this.sim.step(dtReal);
+            this.stepAcc += this.speed * (this.slowmo > 0 ? .25 : 1);
+            while (this.stepAcc >= 1 && !this.sim.done) { this.stepAcc--; this.sim.step(dtReal); }
+            // idle chatter gives the crew a voice
+            if ((this.chatterT -= dtReal) <= 0)
+            {
+                this.chatterT = 7 + Math.random() * 9;
+                const ws = this.sim.workers.filter(w => !w.injured && !this.sim.isWalking(w));
+                if (ws.length) this.bark(pickOne(ws), 'idle', true);
+            }
         }
-        if (this.sim.done && !this.finishing) { this.finishing = true; hudShiftFinished(); }
+        this.barks = this.barks.filter(b => (b.t += dtReal) < b.life);
+        if (this.sim.done && !this.finishing) { this.finishing = true; callout('SHIFT OVER!', this.targetHit ? 'gold' : 'blue', { sub:`${fmtUnits(this.sim.stats.shipped)} units shipped` }); hudShiftFinished(); }
 
         // visuals
         const simDt = this.paused ? 0 : dtReal * this.speed;
@@ -519,7 +587,7 @@ const shiftView =
             let qTotal = 0;
             for (const z of ZONE_KEYS) qTotal += this.sim.zones[z].queue.length;
             const pressure = clamp(qTotal / (this.sim.cap * 4), 0, 1);
-            playSfx('rumble', .05 + pressure * .35, .9 + pressure * .3);
+            playSfx('rumble', .05 + pressure * .35 + (this.finalHour ? .12 : 0), .9 + pressure * .3 + (this.finalHour ? .15 : 0));
         }
         hudUpdate();
     },
@@ -656,6 +724,26 @@ const shiftView =
         const order = sim.workers.filter(w => !w.injured).sort((a, c)=> (this.drag?.id === a.id) - (this.drag?.id === c.id) || this.workerPos(c).y - this.workerPos(a).y);
         for (const w of order) this.drawWorker(ctx, w);
         for (const d of this.drops) this.drawDrop(ctx, d);
+        for (const b of this.barks)
+        {
+            const w = sim.worker(b.id); if (!w || w.injured) continue;
+            const p = this.workerPos(w), pop = Math.min(1, b.t * 6);
+            if (!b.w || b.scale !== cameraScale)
+            {
+                const px = Math.max(.34, 10.5 / cameraScale) * cameraScale;
+                mainContext.save(); mainContext.font = `${px}px ${fontDefault}`; b.w = mainContext.measureText(b.text).width / cameraScale + .55; mainContext.restore();
+                b.scale = cameraScale;
+            }
+            const wdt = b.w, hgt = Math.max(.82, 18 / cameraScale);
+            ctx.globalAlpha = b.t > b.life - .3 ? (b.life - b.t) / .3 : 1;
+            const bx = p.x + .3, by = p.y + 1.75 + pop * .1;
+            ctx.save(); ctx.translate(bx, by); ctx.scale(pop, pop);
+            NX.poly(ctx, [{ x:-.5, y:-.35 }, { x:-.75, y:-.75 }, { x:-.05, y:-.35 }], NX.O);
+            NX.rr(ctx, 0, 0, wdt + .1, hgt, hgt / 2, NX.O, null, 0);
+            NX.rr(ctx, 0, .02, wdt - .06, hgt - .16, (hgt - .16) / 2, '#ffffff', null, 0);
+            NX.poly(ctx, [{ x:-.45, y:-.3 }, { x:-.66, y:-.62 }, { x:-.12, y:-.3 }], '#ffffff');
+            ctx.restore(); ctx.globalAlpha = 1;
+        }
         for (const inc of sim.incidents) if (!inc.done) this.drawIncident(ctx, inc);
         if (this.drag?.moved && this.hoverZone)
         {
@@ -707,6 +795,12 @@ const shiftView =
             const p = this.workerPos(w);
             wmText(w.s.nickname || w.s.name.split(' ')[0], p.add(vec2(0, -1.02)), .28, w.s.homegrown ? wmHex('#b8f28c') : WHITE, .1, O);
         }
+        for (const b of this.barks)
+        {
+            const w = sim.worker(b.id); if (!w || w.injured) continue;
+            const a = b.t > b.life - .3 ? (b.life - b.t) / .3 : 1;
+            wmText(b.text, this.workerPos(w).add(vec2(.3, 1.77)), .34 * Math.min(1, b.t * 6), new Color(.17, .18, .26, a));
+        }
         for (const inc of sim.incidents) if (!inc.done)
         {
             const w = sim.worker(inc.workerId); if (!w) continue;
@@ -719,6 +813,7 @@ const shiftView =
     {
         if (!this.active || !this.sim) return;
         for (const b of this.bubbles) b.draw();
+        calloutDraw();
         const s = mainCanvasSize, ctx = mainContext;
         if (this.vignette > 0)
         {
