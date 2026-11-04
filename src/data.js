@@ -30,10 +30,10 @@ const ATTR_SHORT =
 // seconds per package, hazard level and what incidents can happen there.
 const ZONE_DEFS =
 {
-    blue:   { name:'Inbound',     sub:'Receiving',         hex:'#3b82f6', icon:'📥', baseTime:2.1, risk:1.0,
+    blue:   { name:'Goods In',    sub:'Booking-in',         hex:'#3b82f6', icon:'📥', baseTime:2.1, risk:1.0,
               weights:{productivity:.3, accuracy:.15, strength:.2, workRate:.2, teamwork:.15},
               incidents:['falling','trip','strain'] },
-    green:  { name:'Stow',        sub:'Storage',           hex:'#22c55e', icon:'🗄️', baseTime:2.4, risk:1.3, cert:'forklift',
+    green:  { name:'Putaway',     sub:'Racking & FLT',           hex:'#22c55e', icon:'🗄️', baseTime:2.4, risk:1.3, cert:'forklift',
               weights:{productivity:.25, strength:.25, safety:.2, concentration:.15, accuracy:.15},
               incidents:['forklift','falling','strain'] },
     yellow: { name:'Pick',        sub:'Order picking',     hex:'#eab308', icon:'🛒', baseTime:2.3, risk:.8,
@@ -42,16 +42,16 @@ const ZONE_DEFS =
     orange: { name:'Pack',        sub:'Packing',           hex:'#f97316', icon:'📦', baseTime:2.2, risk:.7,
               weights:{accuracy:.35, productivity:.3, concentration:.2, teamwork:.15},
               incidents:['cut','spill','strain'] },
-    red:    { name:'Outbound',    sub:'Load & dispatch',   hex:'#ef4444', icon:'🚚', baseTime:2.0, risk:1.4, cert:'forklift',
+    red:    { name:'Despatch',    sub:'Marshalling & loading',   hex:'#ef4444', icon:'🚚', baseTime:2.0, risk:1.4, cert:'forklift',
               weights:{strength:.3, safety:.25, productivity:.25, teamwork:.2},
               incidents:['forklift','strain','falling'] },
-    purple: { name:'Hazmat',      sub:'Special handling',  hex:'#a855f7', icon:'☣️', baseTime:3.3, risk:1.8, cert:'hazmat',
+    purple: { name:'DG',          sub:'Dangerous goods',  hex:'#a855f7', icon:'☣️', baseTime:3.3, risk:1.8, cert:'hazmat',
               weights:{safety:.4, accuracy:.3, concentration:.3},
               incidents:['chemical','spill','cut'] },
-    grey:   { name:'Quality',     sub:'QA & Returns',      hex:'#94a3b8', icon:'🔍', baseTime:2.6, risk:.5,
+    grey:   { name:'QC',          sub:'Quality & returns',      hex:'#94a3b8', icon:'🔍', baseTime:2.6, risk:.5,
               weights:{accuracy:.4, concentration:.3, adaptability:.3},
               incidents:['cut','trip'] },
-    black:  { name:'Maintenance', sub:'Breakdown response',hex:'#334155', icon:'🔧', baseTime:0,   risk:1.2, cert:'maintenance',
+    black:  { name:'Engineering', sub:'MHE & breakdowns',hex:'#334155', icon:'🔧', baseTime:0,   risk:1.2, cert:'maintenance',
               weights:{adaptability:.3, concentration:.3, safety:.2, productivity:.2},
               incidents:['electrical','strain'] },
 };
@@ -171,11 +171,11 @@ const FACILITY_DEFS =
 const TIER_DEFS =
 [
     // volume = forecast parcels per shift, rate = revenue per unit, boardVol = board's shipped-parcel target
-    { name:'Regional Depot',          volume:370, rate:.68, budget:30000,  boardVol:310, squad:14 },
-    { name:'Sort Centre',             volume:470, rate:.70, budget:55000,  boardVol:375, squad:17 },
-    { name:'Fulfilment Centre',       volume:550, rate:.75, budget:90000,  boardVol:440, squad:20 },
-    { name:'National Mega Hub',       volume:650, rate:.80, budget:150000, boardVol:525, squad:24 },
-    { name:'Continental Gateway',     volume:740, rate:.86, budget:240000, boardVol:600, squad:28 },
+    { name:'Regional Depot',          volume:200, rate:.68, budget:30000,  boardVol:165, squad:8  },
+    { name:'Sort Centre',             volume:330, rate:.70, budget:55000,  boardVol:270, squad:13 },
+    { name:'Fulfilment Centre',       volume:470, rate:.75, budget:90000,  boardVol:380, squad:18 },
+    { name:'National Mega Hub',       volume:600, rate:.80, budget:150000, boardVol:490, squad:22 },
+    { name:'Continental Gateway',     volume:720, rate:.86, budget:240000, boardVol:590, squad:27 },
     { name:'Global Mega-Port',        volume:840, rate:.94, budget:380000, boardVol:690, squad:32 },
 ];
 
@@ -209,8 +209,8 @@ const MILESTONE_DEFS =
     streak5:      { title:'5 Shifts Without Injury',icon:'⛑️' },
     promotion:    { title:'Staff Promotion',       icon:'⭐' },
     upgrade:      { title:'New Equipment Unveiled',icon:'🛠️' },
-    league1:      { title:'Top of the League',     icon:'👑' },
-    homegrownDebut:{ title:'Academy Debut',        icon:'🌱' },
+    league1:      { title:'Top of the Rankings',     icon:'👑' },
+    homegrownDebut:{ title:'Apprentice Debut',        icon:'🌱' },
     homegrownHero:{ title:'Homegrown Hero',        icon:'🌟' },
     homegrownBond:{ title:'Homegrown Bond',        icon:'🤝' },
     safe10:       { title:'10 Days Without Accident', icon:'⛑️' },
@@ -240,7 +240,7 @@ const ARCHETYPES =
     guardian:  { label:'Safety Guardian', icon:'🦺', desc:'Eyes everywhere. Never jaywalks.', bias:{ safety:4, concentration:3 }, zone:'red', trait:'Steady' },
     powerhouse:{ label:'Powerhouse',   icon:'💪', desc:'Lifts pallets like pillows.',        bias:{ strength:4, stamina:3 }, zone:'green' },
     brain:     { label:'Brainbox',     icon:'🧠', desc:'Zero mis-picks. Spots every fault.', bias:{ accuracy:4, concentration:2, adaptability:2 }, zone:'orange' },
-    captain:   { label:'Future Captain', icon:'🎖️', desc:'Born leader, lifts the whole crew.', bias:{ leadership:4, teamwork:3 }, zone:'blue', trait:'Team Player' },
+    captain:   { label:'Future Team Leader', icon:'🎖️', desc:'Born leader, lifts the whole crew.', bias:{ leadership:4, teamwork:3 }, zone:'blue', trait:'Team Player' },
 };
 
 // Companies that might head-hunt you
@@ -275,7 +275,7 @@ const MANAGER_PRESETS =
       perks:{ morale:10 }, blurb:'Knows every birthday on the floor. Happy crews work harder and stay longer.' },
     { id:'sam',     name:'Sam Rivera',   title:'TALENT SCOUT', panel:'#7a3a4a', shirt:'#1aa6b8', expr:'neutral',
       look:{ skin:2, hair:5, style:2, hat:0, acc:4 }, stats:{ speed:2, safety:3, money:2, people:3, youth:5 },
-      perks:{ recruit:.6, train:1.15 }, blurb:'Spots a future 5★ picker at the bus stop. Cheaper academy recruits who grow faster.' },
+      perks:{ recruit:.6, train:1.15 }, blurb:'Spots a future 5★ picker at the bus stop. Cheaper apprentice recruits who grow faster.' },
     { id:'custom',  name:'You',          title:'CREATE YOUR OWN', panel:'#5a5a5a', shirt:'#38bdf8', expr:'grin',
       look:null, stats:{ speed:3, safety:3, money:3, people:3, youth:3 }, perks:{}, blurb:'Design your own manager from hard hat to haircut.' },
 ];

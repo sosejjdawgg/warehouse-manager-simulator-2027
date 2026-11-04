@@ -12,7 +12,7 @@ let wmNextId = 1;
 const wmPick = (a)=> a[Math.floor(Math.random()*a.length)];
 const wmRI = (a, b)=> a + Math.floor(Math.random()*(b - a + 1)); // inclusive
 const wmGauss = ()=> (Math.random()+Math.random()+Math.random()+Math.random()-2)/2; // ~[-1,1]
-const wmMoney = (v)=> (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
+const wmMoney = (v)=> (v < 0 ? '-£' : '£') + Math.round(Math.abs(v)).toLocaleString();
 const wmChance = (p)=> Math.random() < p;
 const wmRound1 = (v)=> Math.round(v*10)/10;
 
@@ -157,13 +157,11 @@ function newCareer(managerName, companyName, look = null, hex = null)
     wmNextId = 1;
     const tier = 0;
     const staff = [];
-    const plan = ['blue','blue','green','green','yellow','yellow','orange','orange','red','red','purple','grey','black','yellow'];
+    // a small unit: a couple of specialists per team, general operatives, one FLT driver
+    const plan = ['blue','orange','orange','red','green','yellow','blue','grey'];
     for (const z of plan) staff.push(makeStaff({ quality: wmRI(7, 12), zone: z, scouted:true }));
-    // guarantee a couple of key certs
-    staff[2].certs.includes('forklift') || staff[2].certs.push('forklift');
-    staff[8].certs.includes('forklift') || staff[8].certs.push('forklift');
-    staff[10].certs.includes('hazmat') || staff[10].certs.push('hazmat');
-    staff[12].certs.includes('maintenance') || staff[12].certs.push('maintenance');
+    // guarantee a forklift ticket
+    staff[4].certs.includes('forklift') || staff[4].certs.push('forklift');
     for (const s of staff) s.bestStars = starsFor(zoneRating(s, bestZone(s)));
 
     const rivals = RIVAL_DEFS.map(r => ({
@@ -208,10 +206,10 @@ function newCareer(managerName, companyName, look = null, hex = null)
     refreshMarket(true);
     autoLineup();
     pushMsg('board', 'Welcome to ' + career.company,
-        `The board has appointed you Warehouse Manager of our ${TIER_DEFS[tier].name}. ` +
+        `Head office has appointed you Warehouse Manager of our ${TIER_DEFS[tier].name}. ` +
         `We expect at least ${TIER_DEFS[tier].boardVol * UNITS_PER_PARCEL} units shipped per shift, a clean safety record and a profit. ` +
         `Your assistant manager, ${career.assistant.name}, can run shifts for you — but don't leave a weak crew unsupervised.`);
-    pushMsg('news', 'League preview: 8 warehouses, one crown',
+    pushMsg('news', 'Rankings preview: 8 warehouses, one crown',
         'Primeway Fulfilment are favourites again. Brownline Ground boast the best safety record in the region. Kestrel Logistics have been accused of poaching staff aggressively.');
     return career;
 }
@@ -253,27 +251,21 @@ function milestone(key, detail = '')
 // Lineup
 function autoLineup()
 {
-    // Fill slots in priority order: one per main-flow zone, then a second each,
-    // then specialists, then extras where volume bites hardest.
+    // Pick the shift rota: the site's crew size, best people first (always bring an FLT driver),
+    // everyone else on standby. Each person's rota team is their best team.
     const avail = career.staff.filter(isAvailable);
-    const main = ['blue','green','yellow','orange','red'];
-    const slots = [...main, ...main, 'black', 'purple', 'grey', 'yellow', 'orange', 'green', 'blue', 'red', 'yellow', 'orange', 'green', 'blue', 'red'];
-    const lineup = {};
-    const taken = new Set();
-    for (const z of slots)
+    const size = wvSiteFor(career.tier).crew;
+    const score = (s)=> zoneRating(s, bestZone(s)) + (s.condition - 100) * .04 + s.morale * .01;
+    const sorted = [...avail].sort((a, b)=> score(b) - score(a));
+    const pick = sorted.slice(0, size);
+    if (!pick.some(s => s.certs.includes('forklift')))
     {
-        if (taken.size >= avail.length) break;
-        let best = null, bestR = -99;
-        for (const s of avail)
-        {
-            if (taken.has(s.id)) continue;
-            // prefer specialists in their own zone; don't waste a star on a weak fit
-            const r = zoneRating(s, z) - (zoneRating(s, bestZone(s)) - zoneRating(s, z)) * .5 + (s.condition - 100) * .03;
-            if (r > bestR) { bestR = r; best = s; }
-        }
-        if (best) { lineup[best.id] = z; taken.add(best.id); }
+        const d = sorted.find(s => s.certs.includes('forklift'));
+        if (d && pick.length) { pick[pick.length - 1] = d; }
     }
-    for (const s of avail) if (!taken.has(s.id)) lineup[s.id] = 'bench';
+    const teams = new Set(wvSiteFor(career.tier).zones.map(z => WV_ZONES[z].zone));
+    const lineup = {};
+    for (const s of avail) lineup[s.id] = !pick.includes(s) ? 'bench' : teams.has(bestZone(s)) && zoneRating(s, bestZone(s)) >= 9 ? bestZone(s) : 'op';
     career.lineup = lineup;
 }
 function cleanLineup()
@@ -296,9 +288,10 @@ function crewRisk()
     const avgSafety = avg(s => s.attrs.safety);
     const avgMorale = avg(s => s.morale);
     const avgCond = avg(s => s.condition);
-    const avgZone = avg(s => zoneRating(s, career.lineup[s.id]));
+    const zoneOf = (s)=> ZONE_DEFS[career.lineup[s.id]] ? career.lineup[s.id] : bestZone(s);
+    const avgZone = avg(s => zoneRating(s, zoneOf(s)));
     const proneCount = crew.filter(s => hasTrait(s, 'Accident-Prone') || hasTrait(s, 'Clumsy')).length;
-    const missingCerts = crew.filter(s => { const c = ZONE_DEFS[career.lineup[s.id]].cert; return c && c !== 'maintenance' && !s.certs.includes(c); }).length;
+    const missingCerts = crew.filter(s => { const c = ZONE_DEFS[career.lineup[s.id]]?.cert; return c && c !== 'maintenance' && c !== 'forklift' && !s.certs.includes(c); }).length;
     let mult = 1 * (2 - avgSafety/20*1.5) / 1.25 * (1 + (100 - avgCond)/150) * (avgMorale < 40 ? 1.3 : 1) * (1 + proneCount*.08) * (1 + missingCerts*.12);
     mult *= (1 - career.facilities.safety*.08);
     const competence = avgZone;
@@ -606,8 +599,8 @@ function endWeek()
     summary.board = { delta, volScore, safetyScore, profitScore, moraleScore, leagueScore, confidence:c.board.confidence, avgShipped, target };
     if (!c.manager.owner) pushMsg('board', `📊 Week ${c.week} board review (${delta >= 0 ? '+' : ''}${delta})`,
         `Average shipped ${Math.round(avgShipped*UNITS_PER_PARCEL)} units vs target ${Math.round(target*UNITS_PER_PARCEL)}. ` +
-        `Incidents: ${L.incidents} (${L.serious} serious). Weekly profit ${wmMoney(profit)}. League position: ${ordinal(pos)}. ` +
-        `Board confidence is now ${c.board.confidence}%.` + (c.board.confidence < 25 ? ' ⚠️ The board is losing patience.' : ''));
+        `Incidents: ${L.incidents} (${L.serious} serious). Weekly profit ${wmMoney(profit)}. Rankings position: ${ordinal(pos)}. ` +
+        `Head office confidence is now ${c.board.confidence}%.` + (c.board.confidence < 25 ? ' ⚠️ Head office is losing patience.' : ''));
 
     if (c.board.confidence <= 5 && !c.manager.owner)
     {
@@ -615,7 +608,7 @@ function endWeek()
         else
         {
             c.board.finalWarning = true;
-            pushMsg('board', '🟥 FINAL WARNING from the board', 'Confidence has collapsed. Improve volume, safety or profit next week or you will be relieved of your duties.');
+            pushMsg('board', '🟥 FINAL WARNING from head office', 'Confidence has collapsed. Improve volume, safety or profit next week or you will be relieved of your duties.');
         }
     }
     else if (c.board.confidence > 20) c.board.finalWarning = false;
@@ -640,7 +633,7 @@ function endSeason()
     const pos = table.findIndex(r => r.you) + 1;
     const res = { season:c.season, position:pos, table, promoted:false, sacked:false };
     c.flags.stintSeasons = (c.flags.stintSeasons || 0) + 1;
-    if (pos === 1) { c.manager.trophies.push(`S${c.season} League Champions — ${c.company} (${tierDef().name})`); c.manager.wallet += 15000; }
+    if (pos === 1) { c.manager.trophies.push(`Y${c.season} Depot of the Year — ${c.company} (${tierDef().name})`); c.manager.wallet += 15000; }
     if (pos <= 2 && c.tier < TIER_DEFS.length - 1)
     {
         res.promoted = true;
@@ -648,9 +641,9 @@ function endSeason()
         c.cash += 15000 * c.tier;
         c.board.confidence = clamp(c.board.confidence + 20, 0, 100);
         c.manager.wallet += 8000 * c.tier;
-        c.manager.trophies.push(`S${c.season} Promotion — ${c.company} to ${TIER_DEFS[c.tier].name}`);
+        c.manager.trophies.push(`Y${c.season} Stepped up — ${c.company} to ${TIER_DEFS[c.tier].name}`);
         if (c.tier === TIER_DEFS.length - 1) milestone('empire', TIER_DEFS[c.tier].name);
-        pushMsg('board', `🏆 Promotion to ${tierDef().name}!`, `Finishing ${ordinal(pos)} has earned ${c.company} a bigger site. Expect higher volume, bigger contracts — and tougher expectations.`);
+        pushMsg('board', `🏆 Stepping up to ${tierDef().name}!`, `Finishing ${ordinal(pos)} has earned ${c.company} a bigger site. Expect higher volume, bigger contracts — and tougher expectations.`);
     }
     else if (pos >= 7 && c.board.confidence < 35 && !c.manager.owner)
     {
@@ -660,7 +653,7 @@ function endSeason()
     else
     {
         c.board.confidence = clamp(c.board.confidence + (pos <= 4 ? 8 : -6), 0, 100);
-        pushMsg('board', `Season ${c.season} complete — ${ordinal(pos)}`, pos <= 4 ? 'A solid season. The board renews its faith in you.' : 'A disappointing season. Improvement is expected next year.');
+        pushMsg('board', `Year ${c.season} complete — ${ordinal(pos)}`, pos <= 4 ? 'A solid year. Head office renews its faith in you.' : 'A disappointing year. Improvement is expected next year.');
     }
     if (!res.sacked)
     {
@@ -931,7 +924,7 @@ function signStaff(s, wage, weeks)
     const c = career;
     if (c.staff.length >= tierDef().squad + 4) return { ok:false, text:'Your break room is full — release someone first.' };
     const fee = transferFee(s);
-    if (c.cash < fee) return { ok:false, text:'Not enough cash for the transfer fee.' };
+    if (c.cash < fee) return { ok:false, text:'Not enough cash for the poaching fee.' };
     const p = acceptChance(s, wage, weeks, true, fee);
     if (!wmChance(p))
     {

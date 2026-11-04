@@ -81,7 +81,7 @@ function draftRecruit(arch = 'speedster')
 function signRecruit(s)
 {
     const c = career;
-    if (academyCount() >= academySlots()) return 'Academy is full — upgrade the Training Centre for more places.';
+    if (academyCount() >= academySlots()) return 'The apprentice scheme is full — upgrade the Training Centre for more places.';
     if (c.staff.length >= tierDef().squad + 4) return 'Your break room is full — release someone first.';
     if (c.cash < recruitCost()) return 'Not enough cash for the recruitment drive.';
     c.cash -= recruitCost(); c.weekLedger.other += recruitCost();
@@ -94,7 +94,7 @@ function signRecruit(s)
     s.stats.joined = `S${c.season}`;
     c.staff.push(s);
     c.lineup[s.id] = 'bench';
-    pushMsg('staff', `🌱 ${displayName(s)} joins the academy`, `${s.name}${s.nickname ? ` "${s.nickname}"` : ''} (${s.age}, ${ARCHETYPES[s.archetype].label}) has signed their first contract. Develop them well and they'll stay loyal for life.`);
+    pushMsg('staff', `🌱 ${displayName(s)} joins the apprentice scheme`, `${s.name}${s.nickname ? ` "${s.nickname}"` : ''} (${s.age}, ${ARCHETYPES[s.archetype].label}) has signed their first contract. Develop them well and they'll stay loyal for life.`);
     return null;
 }
 function displayName(s) { return s.nickname ? `${s.name.split(' ')[0]} "${s.nickname}"` : s.name; }
@@ -128,13 +128,13 @@ function homegrownProgress(res)
             {
                 s.homegrown[key] = true;
                 c.manager.rep = clamp(c.manager.rep + goal - 1, 0, 100);
-                milestone('homegrownHero', `Academy graduate ${displayName(s)} reaches ${goal}★ — reputation +${goal - 1}`);
+                milestone('homegrownHero', `Apprentice graduate ${displayName(s)} reaches ${goal}★ — reputation +${goal - 1}`);
                 if (goal >= 4 && !c.hallOfFame.find(h => h.id === s.id))
-                    c.hallOfFame.push({ id:s.id, name:displayName(s), look:s.look, note:`Academy class of S${s.homegrown.season} · ${goal}★ ${ZONE_DEFS[bestZone(s)].name}`, kind:'hero' });
+                    c.hallOfFame.push({ id:s.id, name:displayName(s), look:s.look, note:`Apprentice class of Y${s.homegrown.season} · ${goal}★ ${ZONE_DEFS[bestZone(s)].name}`, kind:'hero' });
             }
         }
     }
-    if (hasHomegrownBond(c.lineup) && res.workers.filter(w => w.rating).length >= 8) milestone('homegrownBond', 'More than half the floor came through your academy');
+    if (hasHomegrownBond(c.lineup) && res.workers.filter(w => w.rating).length >= 8) milestone('homegrownBond', 'More than half the floor came through your apprentice scheme');
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ function legacyWeek(summary)
         if (c.cash < -25000)
         {
             if (c.flags.bankWarning) { c.board.sacked = true; c.flags.bankrupt = true; }
-            else { c.flags.bankWarning = true; pushMsg('board', '🏦 The bank is calling', 'Your company is deep in the red. Get back above -$25,000 by next week or the bank will foreclose.'); }
+            else { c.flags.bankWarning = true; pushMsg('board', '🏦 The bank is calling', 'Your company is deep in the red. Get back above -£25,000 by next week or the bank will foreclose.'); }
         }
         else c.flags.bankWarning = false;
     }

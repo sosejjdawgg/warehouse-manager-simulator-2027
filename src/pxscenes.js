@@ -224,7 +224,7 @@ function sceneShiftIntro(sim, onDone)
             row(1, 'FORECAST', fmtUnits(f.volume));
             row(2, 'CREW RISK', risk.label.toUpperCase(), ['#7ee36b', '#ffd23f', '#ff6b6b'][risk.level]);
             row(3, 'DAYS SAFE', String(c.records.daysSinceAccident));
-            row(4, 'LINE', LINE_SPEEDS[sim.lineSpeed].label.toUpperCase() + ' →');
+            row(4, 'WAVES', sim.waves ? sim.waves.length + ' TO CUT-OFF' : LINE_SPEEDS[sim.lineSpeed].label.toUpperCase());
             const cond = f.notes.map(n => n.replace(/[^\x20-\x7E]/g, '').trim()).filter(Boolean)[0];
             if (cond) bmText(ctx, cond.slice(0, 27), px + 6, py + 64, '#7ec8ff', 1, '#000');
             // Barry ticker
@@ -307,7 +307,7 @@ function sceneTrophy(kind, data, onDone)
             [st.city, st.cityX] = scnCanvas(W, H); scnSkyline(st.cityX, W, ground, pxRamp('#3d4280'), 4, '#ffe28a');
             st.wh = scnWarehouse(c.company, c.companyHex, 190);
             st.hero = pixelPortrait(c.manager.look, { expr:'shout', shirt:c.companyHex, hat:false, pose:'fist', k:2 });
-            st.word = pixelText(champ ? 'CHAMPIONS!' : 'PROMOTED!', champ ? 'rainbow' : 'gold', 38);
+            st.word = pixelText(champ ? 'DEPOT OF THE YEAR!' : 'STEPPING UP!', champ ? 'rainbow' : 'gold', 38);
             st.ground = ground; st.sparks = [];
         },
         events:[{ t:.1, fn:()=> playSfx('fanfare', 1) }, { t:.9, fn:(st)=> { st.shake = 1.2; st.flash = .7; playSfx('flowUp', 1, 1.3); } }],
@@ -328,7 +328,7 @@ function sceneTrophy(kind, data, onDone)
             const hs = Math.min(1, Math.max(0, (t - .5) / .5));
             ctx.drawImage(st.hero, Math.round(W / 2 - st.hero.width / 2), Math.round(H - st.hero.height * hs - 4));
             scnSlam(ctx, st, st.word, .9, W / 2, H * .2, W * .9);
-            if (t > 1.5) bmText(ctx, champ ? `${c.company} WIN THE LEAGUE` : `${c.company} > ${tierDef().name}`, W / 2, H * .2 + 30, '#ffffff', 1, '#000', 'center');
+            if (t > 1.5) bmText(ctx, champ ? `${c.company} ARE DEPOT OF THE YEAR` : `${c.company} > ${tierDef().name}`, W / 2, H * .2 + 30, '#ffffff', 1, '#000', 'center');
         },
     }, onDone);
 }

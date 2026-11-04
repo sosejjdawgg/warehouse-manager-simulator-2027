@@ -27,7 +27,9 @@ function starsHtml(r, fuzzy = false)
 }
 function zonePill(z, extra = '')
 {
-    if (z === 'bench') return `<span class="zpill bench">☕ Break${extra}</span>`;
+    if (z === 'bench') return `<span class="zpill bench">☕ Standby${extra}</span>`;
+    if (z === 'op') return `<span class="zpill" style="--zc:#ffd23f">🚶 Operative${extra}</span>`;
+    if (z === 'flt') return `<span class="zpill" style="--zc:#f59e0b">🚜 FLT driver${extra}</span>`;
     const d = ZONE_DEFS[z];
     return `<span class="zpill" style="--zc:${d.hex}">${d.icon} ${d.name}${extra}</span>`;
 }
@@ -86,8 +88,8 @@ function showHub(tab)
     const c = career;
     const t = tierDef();
     const tabs = [
-        ['overview','🏠','Overview'], ['staff','👷','Staff'], ['training','🎓','Training'], ['transfers','🤝','Transfers'],
-        ['academy','🌱','Academy'], ['facilities','🏗️','Facilities'], ['league','🏆','League'], ['finances','💰','Finances'], ['career','💼','Career'], ['inbox','✉️','Inbox'],
+        ['overview','🏠','Overview'], ['staff','👷','Staff'], ['training','🎓','Training'], ['transfers','🤝','Recruitment'],
+        ['academy','🌱','Apprentices'], ['facilities','🏗️','Facilities'], ['league','🏆','Rankings'], ['finances','💰','Finances'], ['career','💼','Career'], ['inbox','✉️','Inbox'],
     ];
     const unread = unreadCount();
     const pend = pendingDecisions().length;
@@ -95,12 +97,12 @@ function showHub(tab)
     <div class="hub">
         <header class="top">
             ${safetyBoardHtml(c.records.daysSinceAccident, c.records.bestSafeRun, true)}
-            <div class="co"><b style="color:${c.companyHex}">${esc(c.company)}</b><span>${t.name} · Season ${c.season} · Week ${Math.min(c.week, SEASON_WEEKS)}/${SEASON_WEEKS} · ${wmDayName(c.day)}${isPeakWeek() ? ' · <em class="peak">PEAK</em>' : ''}</span></div>
+            <div class="co"><b style="color:${c.companyHex}">${esc(c.company)}</b><span>${t.name} · Year ${c.season} · Week ${Math.min(c.week, SEASON_WEEKS)}/${SEASON_WEEKS} · ${wmDayName(c.day)}${isPeakWeek() ? ' · <em class="peak">PEAK</em>' : ''}</span></div>
             <div class="kpis">
                 <div class="kpi"><small>Cash</small><b class="${c.cash < 0 ? 'neg' : ''}">${wmMoney(c.cash)}</b></div>
-                ${c.manager.owner ? `<div class="kpi"><small>Owner</small><b>👑</b></div>` : `<div class="kpi"><small>Board</small><b>${c.board.confidence}%</b><i class="bar"><i style="width:${c.board.confidence}%;background:${c.board.confidence > 55 ? '#22c55e' : c.board.confidence > 30 ? '#facc15' : '#ef4444'}"></i></i></div>`}
+                ${c.manager.owner ? `<div class="kpi"><small>Owner</small><b>👑</b></div>` : `<div class="kpi"><small>Head office</small><b>${c.board.confidence}%</b><i class="bar"><i style="width:${c.board.confidence}%;background:${c.board.confidence > 55 ? '#22c55e' : c.board.confidence > 30 ? '#facc15' : '#ef4444'}"></i></i></div>`}
                 <div class="kpi"><small>Rep</small><b>${c.manager.rep}</b></div>
-                <div class="kpi"><small>League</small><b>${ordinal(leaguePosition())}</b></div>
+                <div class="kpi"><small>Rankings</small><b>${ordinal(leaguePosition())}</b></div>
             </div>
             <button class="go" data-act="preshift">Next Shift ▶</button>
         </header>
@@ -143,7 +145,7 @@ function renderOverview()
             <h3>Next shift — ${wmDayName(c.day)}, Week ${c.week}</h3>
             <div class="big3">
                 <div><small>Forecast</small><b>${fmtUnits(f.volume)}</b><span>units</span></div>
-                <div><small>Board target</small><b>${fmtUnits(f.target)}</b><span>units shipped</span></div>
+                <div><small>Head office target</small><b>${fmtUnits(f.target)}</b><span>units shipped</span></div>
                 <div><small>Crew risk</small><b class="risk r${risk.level}">${risk.label}</b><span>safety ${risk.avgSafety.toFixed(1)} · morale ${Math.round(risk.avgMorale)}</span></div>
             </div>
             ${f.notes.length ? `<div class="notes">${f.notes.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
@@ -160,7 +162,7 @@ function renderOverview()
             </div>
             ${last.workerOfShift ? `<p class="small">⭐ Worker of the shift: <b>${esc(last.workerOfShift.name)}</b> (${last.workerOfShift.rating.toFixed(1)})</p>` : ''}
             <button class="ghost" data-act="lastReport">Full report</button></section>` : ''}
-        <section class="card"><h3>Squad status</h3>
+        <section class="card"><h3>Crew status</h3>
             <p>${c.staff.length} staff · avg morale ${moraleDot(avgMorale())} ${moraleLabel(avgMorale())} · weekly wages ${wmMoney(c.staff.reduce((a,s)=>a+s.wage,0))}</p>
             ${injured.length ? `<p class="small">🚑 Injured: ${injured.map(s => `${esc(s.name)} (${s.injury.days}d)`).join(', ')}</p>` : '<p class="small pos">✅ Everyone fit</p>'}
             ${expiring.length ? `<p class="small warn">📝 Contracts expiring: ${expiring.map(s => `${esc(s.name)} (${s.contractWeeks}w)`).join(', ')}</p>` : ''}
@@ -174,7 +176,7 @@ function renderOverview()
                 <div><small>Shifts</small><b>${c.records.shiftsPlayed}</b></div>
             </div>
         </section>
-        ${news.length ? `<section class="card"><h3>📰 Around the league</h3>${news.map(m => `<p class="small"><b>${esc(m.title)}</b><br>${esc(m.body)}</p>`).join('')}</section>` : ''}
+        ${news.length ? `<section class="card"><h3>📰 Around the rankings</h3>${news.map(m => `<p class="small"><b>${esc(m.title)}</b><br>${esc(m.body)}</p>`).join('')}</section>` : ''}
     </div>`;
 }
 function modsHtml()
@@ -240,7 +242,7 @@ function marketRow(s)
     const r = known ? zoneRating(s, bz) : zoneRating({ ...s, attrs: Object.fromEntries(ATTR_KEYS.map(k => [k, attrView(s, k).v])) }, bz);
     const fee = transferFee(s);
     return `<button class="srow" data-act="market" data-id="${s.id}">
-        <span class="nm withAva">${staffAva(s, 40)}<span><b>${esc(s.name)}</b><small>${s.age} · ${known ? s.traits.join(', ') : 'Unscouted'}</small></span></span>
+        <span class="nm withAva">${staffAva(s, 40)}<span><b>${esc(s.name)}</b><small>${s.age} · ${known ? s.traits.join(', ') : 'Unvetted'}</small></span></span>
         <span class="bz">${zonePill(bz)} ${starsHtml(r, !known)}</span>
         <span class="cell"><small>Wants</small>${wmMoney(Math.round(contractDemand(s) * (s.employer ? 1.12 : 1) / 10) * 10)}/wk</span>
         <span class="cell"><small>${fee ? 'Fee' : 'Free'}</small>${fee ? wmMoney(fee) : '—'}</span>
@@ -255,9 +257,9 @@ function renderTransfers()
     else if (wmMarketTab === 'trainees') body = c.market.filter(s => s.age < 21).map(marketRow).join('');
     else body = c.rivals.map(r => `<h4 style="color:${r.hex}">${esc(r.name)} <small class="muted">${esc(r.style)}</small></h4>${r.staff.map(marketRow).join('')}`).join('');
     return `<section class="card">
-        <div class="hrow"><h3>Transfer market</h3><span class="small">Squad ${c.staff.length}/${tierDef().squad + 4} · Scouting ${wmMoney(scoutCost())}</span></div>
+        <div class="hrow"><h3>Jobs board</h3><span class="small">Crew ${c.staff.length}/${tierDef().squad + 4} · Vetting ${wmMoney(scoutCost())}</span></div>
         <div class="seg">${[['free','Free agents'],['trainees','Trainees'],['rivals','Rival staff']].map(([k, l]) => `<button class="${wmMarketTab === k ? 'on' : ''}" data-act="mtab" data-k="${k}">${l}</button>`).join('')}</div>
-        <p class="small muted">Unscouted attributes are shown as ranges. Rival staff need a transfer fee — and may be loyal to their employer.</p>
+        <p class="small muted">Unvetted attributes are shown as ranges. Rival staff need a poaching fee — and may be loyal to their employer.</p>
         <div class="slist">${body}</div>
     </section>`;
 }
@@ -284,11 +286,11 @@ function renderLeague()
 {
     const rows = leagueTable();
     const day = career.lastReport?.rivalDay;
-    return `<section class="card"><h3>League table — Season ${career.season}</h3>
-        <p class="small muted">Points are awarded every week for rank in Volume, Safety, Cost per unit and Customer Satisfaction (8 for 1st … 1 for 8th). Top 2 earn promotion to a bigger site.</p>
+    return `<section class="card"><h3>Network rankings — Year ${career.season}</h3>
+        <p class="small muted">Points are awarded every week for rank in Volume, Safety, Cost per unit and Customer Satisfaction (8 for 1st … 1 for 8th). Top 2 step up to a bigger site.</p>
         <div class="tablewrap"><table class="league">
             <tr><th>#</th><th>Company</th><th>Pts</th><th>Units</th><th title="Weighted incidents per 10k units">Safety</th><th title="Cost per unit">CPU</th><th>CSAT</th></tr>
-            ${rows.map((r, i) => `<tr class="${r.you ? 'you' : ''}"><td>${i + 1}</td><td><i class="sw" style="background:${r.hex}"></i>${esc(r.name)}</td><td><b>${r.points}</b></td><td>${r.units.toLocaleString()}</td><td>${r.safety.toFixed(2)}</td><td>${r.cpu ? '$' + r.cpu.toFixed(3) : '–'}</td><td>${r.shifts ? r.csat.toFixed(1) + '%' : '–'}</td></tr>`).join('')}
+            ${rows.map((r, i) => `<tr class="${r.you ? 'you' : ''}"><td>${i + 1}</td><td><i class="sw" style="background:${r.hex}"></i>${esc(r.name)}</td><td><b>${r.points}</b></td><td>${r.units.toLocaleString()}</td><td>${r.safety.toFixed(2)}</td><td>${r.cpu ? '£' + r.cpu.toFixed(3) : '–'}</td><td>${r.shifts ? r.csat.toFixed(1) + '%' : '–'}</td></tr>`).join('')}
         </table></div>
     </section>
     ${day ? `<section class="card"><h3>Yesterday's results</h3><div class="slist">${[{ name:career.company, hex:'#38bdf8', shipped:career.lastReport.shipped, incidents:career.lastReport.injuries.length, you:true }, ...day].sort((a,b)=> b.shipped - a.shipped).map(r => `<div class="trow ${r.you ? 'you' : ''}"><span class="nm"><i class="sw" style="background:${r.hex}"></i>${esc(r.name)}</span><span>${fmtUnits(r.shipped)} units</span><span>${r.incidents ? `⚠️ ${r.incidents}` : '✅'}</span></div>`).join('')}</div></section>` : ''}`;
@@ -305,8 +307,8 @@ function renderFinances()
     return `<div class="grid">
         <section class="card"><h3>This week so far</h3>
             ${line('Revenue', L.revenue, 'pos')}${line('Late/defect penalties', -L.penalties, 'neg')}${line('Accident fines', -L.fines, 'neg')}
-            ${line('Energy', -L.energy, 'neg')}${line('Overtime', -L.overtime, 'neg')}${line('Contractors / courses / scouting', -L.other, 'neg')}
-            ${line('Transfers', -L.transfers, L.transfers > 0 ? 'neg' : 'pos')}${line('Upgrades', -L.upgrades, 'neg')}
+            ${line('Energy', -L.energy, 'neg')}${line('Overtime', -L.overtime, 'neg')}${line('Contractors / courses / vetting', -L.other, 'neg')}
+            ${line('Recruitment', -L.transfers, L.transfers > 0 ? 'neg' : 'pos')}${line('Upgrades', -L.upgrades, 'neg')}
             <div class="lline muted"><span>Wages due Friday</span><b>${wmMoney(-wageBill)}</b></div>
             <div class="lline muted"><span>Facility upkeep due Friday</span><b>${wmMoney(-Object.entries(c.facilities).reduce((a,[k,v])=> a + v * (k === 'automation' ? 600 : 110), 0))}</b></div>
         </section>
@@ -367,7 +369,7 @@ function staffDetail(s, market = false)
     else
     {
         actions = `<div class="btnrow wrap">
-            ${s.scouted ? '' : `<button data-act="scout" data-id="${s.id}">🔍 Scout (${wmMoney(scoutCost())})</button>`}
+            ${s.scouted ? '' : `<button data-act="scout" data-id="${s.id}">🔍 Vet (${wmMoney(scoutCost())})</button>`}
             <button class="primary" data-act="signDlg" data-id="${s.id}">✍️ ${s.employer ? 'Approach (fee ' + wmMoney(transferFee(s)) + ')' : 'Offer contract'}</button>
         </div>`;
     }
@@ -375,7 +377,7 @@ function staffDetail(s, market = false)
         <div class="sd">
             <div class="sdh">
                 <div class="sdAva">${staffAva(s, 96, 'happy')}</div>
-                <div><h2>${esc(displayName(s))}</h2>${s.homegrown ? `<p class="pos">🌱 Academy graduate · class of S${s.homegrown.season}${s.archetype ? ' · ' + ARCHETYPES[s.archetype].label : ''}</p>` : ''}<p>${s.age} yrs · ${s.employer ? esc(s.employer) : own ? esc(career.company) : 'Free agent'} · value ${wmMoney(staffValue(s))}</p>
+                <div><h2>${esc(displayName(s))}</h2>${s.homegrown ? `<p class="pos">🌱 Apprentice graduate · class of Y${s.homegrown.season}${s.archetype ? ' · ' + ARCHETYPES[s.archetype].label : ''}</p>` : ''}<p>${s.age} yrs · ${s.employer ? esc(s.employer) : own ? esc(career.company) : 'Looking for work'} · value ${wmMoney(staffValue(s))}</p>
                 <p>${(own || s.scouted) ? s.traits.map(t => `<span class="trait ${TRAIT_DEFS[t].good ? 'g' : 'b'}" title="${esc(TRAIT_DEFS[t].desc)}">${t}</span>`).join('') : '<span class="trait">Personality unknown</span>'}
                    ${s.certs.map(c => `<span class="cert" title="${CERT_DEFS[c].label}">${CERT_DEFS[c].label}</span>`).join('')}</p></div>
                 <div class="sdk">
@@ -405,7 +407,7 @@ function contractDialog(s, signing)
     const start = Math.max(demand, signing ? 0 : s.wage);
     openModal(`
         <h2>${signing ? (s.employer ? 'Approach' : 'Sign') : 'Renew'}: ${esc(s.name)}</h2>
-        ${fee ? `<p>Transfer fee to ${esc(s.employer)}: <b>${wmMoney(fee)}</b></p>` : ''}
+        ${fee ? `<p>Poaching fee to ${esc(s.employer)}: <b>${wmMoney(fee)}</b></p>` : ''}
         <label>Weekly wage: <b id="wageVal">${wmMoney(start)}</b>
             <input type="range" id="wageIn" min="${Math.round(demand * .6 / 10) * 10}" max="${Math.round(demand * 1.6 / 10) * 10}" step="10" value="${start}"></label>
         <div class="seg" id="lenSeg">${[26, 52, 104].map(w => `<button class="${w === 52 ? 'on' : ''}" data-act="len" data-w="${w}">${w} weeks</button>`).join('')}</div>
@@ -443,59 +445,59 @@ function showPreshift()
     const c = career;
     const f = shiftForecast();
     const risk = crewRisk();
+    const site = wvSiteFor(c.tier);
+    const clients = WV_CLIENTS.slice(0, site.clients);
+    const teams = [...new Set(site.zones.map(z => WV_ZONES[z].zone))];
     const avail = c.staff.filter(s => !s.injury);
-    const counts = {};
-    for (const s of avail) { const z = c.lineup[s.id] || 'bench'; counts[z] = (counts[z] || 0) + 1; }
+    const onRota = avail.filter(s => c.lineup[s.id] && c.lineup[s.id] !== 'bench');
     const warnings = [];
-    for (const z of ['blue','green','yellow','orange','red']) if (!counts[z]) warnings.push(`No one in ${ZONE_DEFS[z].name} — the line will stop!`);
-    for (const z of ['green','red','purple'])
-    {
-        const crew = avail.filter(s => c.lineup[s.id] === z);
-        const cert = ZONE_DEFS[z].cert;
-        if (crew.length && !crew.some(s => s.certs.includes(cert))) warnings.push(`${ZONE_DEFS[z].name}: nobody ${CERT_DEFS[cert].label.toLowerCase()} — higher risk`);
-    }
-    if (!counts.black) warnings.push('No maintenance cover — breakdowns will need paid contractors');
-    if (!counts.grey) warnings.push('No QA cover — errors will ship to customers');
-    const tired = avail.filter(s => s.condition < 60 && c.lineup[s.id] !== 'bench');
-    if (tired.length) warnings.push(`${tired.length} starter(s) below 60% condition`);
+    if (onRota.length > site.crew) warnings.push(`${onRota.length} on the rota but the site only needs ${site.crew} — the extras will stand around`);
+    if (onRota.length < site.crew) warnings.push(`Only ${onRota.length} of ${site.crew} on the rota — you'll be short-handed`);
+    if (!onRota.some(s => s.certs.includes('forklift'))) warnings.push('Nobody on the rota has a forklift licence — heavy pallets won\'t move');
+    if (clients.some(cl => cl.dg) && !onRota.some(s => s.certs.includes('hazmat'))) warnings.push('Nobody DG-trained on shift — the DG cage will be slow and risky');
+    for (const t of teams) if (!onRota.some(s => c.lineup[s.id] === t)) warnings.push(`No ${ZONE_DEFS[t].name} specialist picked — the assistant will make do`);
+    const tired = onRota.filter(s => s.condition < 60);
+    if (tired.length) warnings.push(`${tired.length} on the rota below 60% condition`);
     const rivalLine = c.inbox.find(m => m.type === 'news');
+    const opt = (k, label, sel)=> `<option value="${k}" ${sel ? 'selected' : ''}>${label}</option>`;
     $('#screen').innerHTML = `
     <div class="hub pre">
         <header class="top">
-            <div class="co"><b>Pre-shift briefing</b><span>${wmDayName(c.day)} · Week ${c.week} · Season ${c.season}${isPeakWeek() ? ' · <em class="peak">PEAK</em>' : ''}</span></div>
+            <div class="co"><b>Pre-shift briefing</b><span>${wmDayName(c.day)} · Week ${c.week} · Year ${c.season}${isPeakWeek() ? ' · <em class="peak">PEAK</em>' : ''}</span></div>
             <button class="ghost" data-act="hub">✕ Back</button>
         </header>
         <div class="grid">
             <section class="card hero">
                 <div class="big3">
-                    <div><small>Forecast</small><b>${fmtUnits(f.volume)}</b><span>units inbound</span></div>
-                    <div><small>Target</small><b>${fmtUnits(f.target)}</b><span>units shipped</span></div>
+                    <div><small>Inbound</small><b>${fmtUnits(f.volume)}</b><span>units in ${site.waves} waves</span></div>
+                    <div><small>Head office target</small><b>${fmtUnits(f.target)}</b><span>units despatched</span></div>
                     <div><small>Crew risk</small><b class="risk r${risk.level}">${risk.label}</b><span>×${risk.mult.toFixed(2)} incident rate</span></div>
                 </div>
                 ${f.notes.length ? `<div class="notes">${f.notes.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
+                <h4>Today's clients</h4>
+                <div class="clients">${clients.map(cl => `<div class="client"><i style="background:${cl.hex}"></i><b>${esc(cl.name)}</b><span>${cl.recipe.map(z => WV_ZONES[z].icon).join(' → ')} → 🚪</span>${cl.heavy > .2 ? '<small>🪵 heavy</small>' : ''}${cl.dg ? '<small>☣️ DG</small>' : ''}</div>`).join('')}</div>
+                <p class="tiny muted">Site: ${site.docks} goods-in dock${site.docks > 1 ? 's' : ''} · ${site.zones.length} zones (${site.zones.map(z => WV_ZONES[z].icon).join(' ')}) · ${site.forklifts} forklift${site.forklifts > 1 ? 's' : ''} · ${site.seats} seats per zone</p>
                 ${rivalLine ? `<p class="small muted">📰 ${esc(rivalLine.title)}</p>` : ''}
                 ${modsHtml()}
-                <div class="seg" title="Line speed">${Object.entries(LINE_SPEEDS).map(([k, d]) => `<button class="${c.defaultLineSpeed === k ? 'on' : ''}" data-act="lineDefault" data-k="${k}">${d.label}</button>`).join('')}</div>
-                <p class="tiny muted">Careful: −15% speed, −45% risk, staff wait patiently at crossings · Push: +18% speed, +80% risk, faster forklifts, impatient staff</p>
-                <p class="tiny muted">🚜 ${4 + c.tier} forklifts patrol the roads (more when trucks dock). Staff cross at zebra crossings — impatient ones (low Safety/Concentration, Speed Demons, Accident-Prone) jaywalk.</p>
             </section>
             <section class="card">
-                <div class="hrow"><h3>Zone assignments</h3><button data-act="autoLineup">✨ Auto-assign</button></div>
-                <div class="zcount">${[...ZONE_KEYS, 'bench'].map(z => `<span class="zc" style="--zc:${z === 'bench' ? '#64748b' : ZONE_DEFS[z].hex}">${z === 'bench' ? '☕' : ZONE_DEFS[z].icon}<b>${counts[z] || 0}</b></span>`).join('')}</div>
-                ${warnings.length ? `<div class="warnlist">${warnings.map(w => `<p>⚠️ ${esc(w)}</p>`).join('')}</div>` : '<p class="pos small">✅ Lineup looks solid</p>'}
-                <div class="slist">${avail.sort((a, b)=> [...ZONE_KEYS, 'bench'].indexOf(c.lineup[a.id] || 'bench') - [...ZONE_KEYS, 'bench'].indexOf(c.lineup[b.id] || 'bench')).map(s =>
+                <div class="hrow"><h3>Shift rota <span class="small muted">${onRota.length}/${site.crew}</span></h3><button data-act="autoLineup">✨ Auto-pick</button></div>
+                ${warnings.length ? `<div class="warnlist">${warnings.map(w => `<p>⚠️ ${esc(w)}</p>`).join('')}</div>` : '<p class="pos small">✅ Rota looks solid</p>'}
+                <div class="slist">${avail.sort((a, b)=> (c.lineup[a.id] === 'bench') - (c.lineup[b.id] === 'bench') || zoneRating(b, bestZone(b)) - zoneRating(a, bestZone(a))).map(s =>
                 {
                     const z = c.lineup[s.id] || 'bench';
-                    return `<div class="lrow" style="--zc:${z === 'bench' ? '#64748b' : ZONE_DEFS[z].hex}">
+                    const col = z === 'bench' ? '#64748b' : z === 'op' ? '#ffd23f' : ZONE_DEFS[z]?.hex || '#64748b';
+                    return `<div class="lrow" style="--zc:${col}">
                         <button class="nm linkish withAva" data-act="staff" data-id="${s.id}">${staffAva(s, 34)}<b>${esc(displayName(s))}</b><small>${moraleDot(s.morale)} ${Math.round(s.condition)}% · ${s.certs.map(x => CERT_DEFS[x].short).join(' ')}</small></button>
-                        <span>${z !== 'bench' ? starsHtml(zoneRating(s, z)) : ''}</span>
-                        <select data-lineup="${s.id}">${[...ZONE_KEYS, 'bench'].map(k => `<option value="${k}" ${k === z ? 'selected' : ''}>${k === 'bench' ? '☕ Break room' : ZONE_DEFS[k].icon + ' ' + ZONE_DEFS[k].name + ' ' + '★'.repeat(Math.round(starsFor(zoneRating(s, k))))}</option>`).join('')}</select>
+                        <span>${ZONE_DEFS[z] ? starsHtml(zoneRating(s, z)) : ''}</span>
+                        <select data-lineup="${s.id}">${teams.map(k => opt(k, ZONE_DEFS[k].icon + ' ' + ZONE_DEFS[k].name + ' ' + '★'.repeat(Math.round(starsFor(zoneRating(s, k)))), k === z)).join('')}${opt('op', '🚶 General operative', z === 'op' || (z !== 'bench' && !teams.includes(z)))}${opt('bench', '☕ Standby (day off)', z === 'bench')}</select>
                     </div>`;
                 }).join('')}</div>
+                <p class="tiny muted">Specialists are a preference: you seat people yourself in set-up. Licensed drivers (FLT) can take a forklift.</p>
                 ${c.staff.some(s => s.injury) ? `<p class="small muted">🚑 Unavailable: ${c.staff.filter(s => s.injury).map(s => esc(s.name)).join(', ')}</p>` : ''}
             </section>
             <section class="card">
-                <h3>Equipment check</h3>
+                <h3>Kit check</h3>
                 <div class="eqs">${Object.entries(FACILITY_DEFS).map(([k, d]) => `<span>${d.icon} ${d.label.split(' ')[0]} <b>L${c.facilities[k]}</b></span>`).join('')}</div>
             </section>
         </div>
@@ -527,13 +529,13 @@ function startShift(skipStory = false)
     closeModal();
     const sid = !skipStory && storyNext('preShift');
     if (sid) return playStory(sid, ()=> startShift(true));
-    wmSim = new RushSim(career);
+    wmSim = new WaveSim(career);
     sceneShiftIntro(wmSim, ()=>
     {
         setMode('shift');
-        buildRushHud();
-        rushView.start(wmSim);
-        if (!career.flags.rushHelpSeen) rushHelp();
+        waveView.start(wmSim);
+        buildWaveHud();
+        if (!career.flags.waveHelpSeen) wvHelp();
     });
 }
 function simulateShift(skipStory = false)
@@ -541,8 +543,8 @@ function simulateShift(skipStory = false)
     closeModal();
     const sid = !skipStory && storyNext('preShift');
     if (sid) return playStory(sid, ()=> simulateShift(true));
-    wmSim = new ShiftSim(career, { simulated:true });
-    wmSim.runToEnd();
+    wmSim = new WaveSim(career, { assistant:true });
+    wmSim.runToEnd(clamp(career.assistant.quality * ([1.05, .9, .7][crewRisk().level] ?? .8), .15, .95));
     finishShift();
 }
 function hudShiftFinished()
@@ -554,7 +556,7 @@ function finishShift()
 {
     if (!wmSim) return;
     const res = wmSim.result();
-    if (wmSim instanceof RushSim) rushView.stop(); else shiftView.stop();
+    if (waveView.active) waveView.stop(); else if (shiftView.active) shiftView.stop();
     const week = applyShiftResult(res);
     wmSim = null;
     saveCareer();
@@ -696,10 +698,10 @@ function showReport(res, replay = false)
     const r = res;
     const hit = r.shipped >= r.target;
     const maxH = Math.max(1, ...r.hourly.map((v, i)=> v - (r.hourly[i-1] || 0)));
-    const quip = r.injuries.some(i => i.serious) ? 'The board is alarmed by the serious incident.'
-        : !hit ? 'The board notes the shortfall against target.'
-        : r.injuries.length ? 'Good output, but the board wants a cleaner safety record.'
-        : r.csat > .95 ? 'Superb — customers and board alike are delighted.' : 'A solid shift. The board is satisfied.';
+    const quip = r.injuries.some(i => i.serious) ? 'Head office is alarmed by the serious incident.'
+        : !hit ? 'Head office notes the shortfall against target.'
+        : r.injuries.length ? 'Good output, but head office wants a cleaner safety record.'
+        : r.csat > .95 ? 'Superb — customers and head office alike are delighted.' : 'A solid shift. Head office is satisfied.';
     $('#screen').innerHTML = `
     <div class="hub report">
         <header class="top"><div class="gradeBadge g${shiftGrade(r)}">${shiftGrade(r)}</div><div class="co"><b>Post-shift report</b><span>${r.simulated ? '⏩ Simulated · ' : ''}${r.overtimeHours ? `⏱️ ${r.overtimeHours}h overtime · ` : ''}${esc(quip)}</span></div></header>
@@ -707,14 +709,14 @@ function showReport(res, replay = false)
             <section class="card hero">
                 <div class="big3">
                     <div><small>Units shipped</small><b class="${hit ? 'pos' : 'neg'} count" data-to="${r.units}">0</b><span>target ${fmtUnits(r.target)}</span></div>
-                    <div><small>Profit</small><b class="${r.profit >= 0 ? 'pos' : 'neg'} count" data-to="${r.profit}" data-money="1">$0</b><span>rev ${wmMoney(r.revenue)}</span></div>
+                    <div><small>Profit</small><b class="${r.profit >= 0 ? 'pos' : 'neg'} count" data-to="${r.profit}" data-money="1">£0</b><span>rev ${wmMoney(r.revenue)}</span></div>
                     <div><small>On-time · CSAT</small><b class="count" data-to="${Math.round(r.csat * 100)}" data-suffix="%">0%</b><span>on-time ${pct(r.onTime)}</span></div>
                 </div>
                 <div class="mini4">
                     <div><small>UPH</small><b>${r.uph}</b></div>
-                    <div><small>Peak flow</small><b>x${(1 + (r.peakFlow - 1) * .25).toFixed(2)}</b></div>
+                    ${r.wave ? `<div><small>Rating</small><b class="stars">${'★'.repeat(Math.floor(r.wave.stars))}${r.wave.stars % 1 ? '½' : ''}</b></div>` : `<div><small>Peak flow</small><b>x${(1 + (r.peakFlow - 1) * .25).toFixed(2)}</b></div>`}
                     <div><small>Backlog</small><b class="${r.backlog > 20 ? 'neg' : ''}">${fmtUnits(r.backlog)}</b></div>
-                    <div><small>Cost/unit</small><b>$${r.cpu.toFixed(3)}</b></div>
+                    <div><small>Cost/unit</small><b>£${r.cpu.toFixed(3)}</b></div>
                 </div>
                 <div class="hours">${r.hourly.map((v, i)=> { const d = v - (r.hourly[i-1] || 0); return `<i style="height:${d / maxH * 100}%" title="${fmtUnits(d)}"></i>`; }).join('')}</div>
             </section>
@@ -726,18 +728,20 @@ function showReport(res, replay = false)
                     <div><small>Injuries</small><b class="${r.injuries.length ? 'neg' : 'pos'}">${r.injuries.length}</b></div>
                 </div>
                 ${r.injuries.map(i => `<p class="small ${i.serious ? 'neg' : 'warn'}">${i.fatal ? '🕯️ <b>FATAL</b>' : i.serious ? '🚨' : '🩹'} ${esc(i.name)} — ${esc(i.label)} (${esc(i.cause)}${ZONE_DEFS[i.zone] ? ', ' + ZONE_DEFS[i.zone].name : ''})${i.fatal ? '' : ` · out ${i.days} shift${i.days > 1 ? 's' : ''}`}${i.fine ? ` · fine ${wmMoney(i.fine)}` : ''}</p>`).join('') || '<p class="pos small">🛡️ No injuries this shift.</p>'}
-                <p class="small">🚜 Road crossings ${r.crossings} · waited ${Math.round(r.crossWait)} min for forklifts · <span class="${r.jaywalks ? 'neg' : 'pos'}">🏃 jaywalks ${r.jaywalks}</span>${r.forkliftBrakes ? ` · emergency brakings ${r.forkliftBrakes}` : ''}</p>
-                <p class="small muted">Breakdowns ${r.breakdowns} · Bottlenecks ${r.bottlenecks} · Errors caught by QA ${r.caught} · Defects shipped ${r.defects} · Damaged ${r.damaged} · Rush orders late ${r.lateRush} of ${r.rushShipped}</p>
+                ${r.wave ? `<p class="small">🚜 Forklift/walker crossings ${r.crossings} · <span class="${r.wave.toppled ? 'neg' : 'pos'}">📦 stacks toppled ${r.wave.toppled}</span> · damaged ${r.damaged}${r.wave.walkOuts ? ` · <span class="neg">🚪 walk-outs ${r.wave.walkOuts}</span>` : ''}${r.wave.hseFine ? ` · <span class="neg">📋 HSE fine ${wmMoney(r.wave.hseFine)}</span>` : ''}</p>
+                <p class="small muted">Breakdowns ${r.breakdowns} · Mis-sends ${r.wave.misSent} · Brew rounds ${r.wave.brews} · Agency temps ${r.wave.agency}</p>`
+                : `<p class="small">🚜 Road crossings ${r.crossings} · waited ${Math.round(r.crossWait)} min for forklifts · <span class="${r.jaywalks ? 'neg' : 'pos'}">🏃 jaywalks ${r.jaywalks}</span>${r.forkliftBrakes ? ` · emergency brakings ${r.forkliftBrakes}` : ''}</p>
+                <p class="small muted">Breakdowns ${r.breakdowns} · Bottlenecks ${r.bottlenecks} · Errors caught by QA ${r.caught} · Defects shipped ${r.defects} · Damaged ${r.damaged} · Rush orders late ${r.lateRush} of ${r.rushShipped}</p>`}
             </section>
             <section class="card"><h3>Ratings</h3>
                 <div class="slist">${r.workers.filter(w => w.rating).map(w => `
                     <div class="trow"><span class="rt ${ratingClass(w.rating)}">${w.rating.toFixed(1)}</span>
                     <span class="nm"><b>${esc(w.name)}</b>${r.workerOfShift && r.workerOfShift.id === w.id ? ' ⭐' : ''}${w.injured ? ' 🚑' : ''}</span>
-                    <span>${zonePill(w.zone)}</span><span class="small">📦 ${w.processed}${w.repairs ? ` 🔧 ${w.repairs}` : ''}${w.errors ? ` ❌ ${w.errors}` : ''}${w.jaywalks ? ` 🏃 ${w.jaywalks}` : ''}</span>
+                    <span>${zonePill(w.role === 'op' || w.role === 'flt' ? w.role : w.zone)}</span><span class="small">📦 ${w.processed}${w.repairs ? ` 🔧 ${w.repairs}` : ''}${w.errors ? ` ❌ ${w.errors}` : ''}${w.jaywalks ? ` 🏃 ${w.jaywalks}` : ''}</span>
                     <span class="small ${w.moraleDelta > 0 ? 'pos' : w.moraleDelta < 0 ? 'neg' : 'muted'}">${w.moraleDelta > 0 ? '▲' : w.moraleDelta < 0 ? '▼' : '•'} morale</span></div>`).join('')}</div>
             </section>
             <section class="card"><h3>Finances</h3>
-                ${[['Revenue', r.revenue, 'pos'], ['Penalties (late/defects/backlog)', -r.penalties, 'neg'], ['Accident fines', -r.fines, 'neg'], ['Energy', -r.energyCost, 'neg'], ['Overtime', -r.overtimeCost, 'neg'], ['Contractors', -r.contractorCost, 'neg'], ['Wages (daily share)', -r.dailyWages, 'neg']]
+                ${[['Revenue', r.revenue, 'pos'], ['Penalties (short loads, mis-sends, demurrage, damage)', -r.penalties, 'neg'], ['Accident fines', -r.fines, 'neg'], ['Energy', -r.energyCost, 'neg'], ['Overtime', -r.overtimeCost, 'neg'], ['Contractors & agency', -r.contractorCost, 'neg'], ['Wages (daily share)', -r.dailyWages, 'neg']]
                     .filter(x => x[1]).map(([l, v, c]) => `<div class="lline"><span>${l}</span><b class="${c}">${wmMoney(v)}</b></div>`).join('')}
                 <div class="lline total"><span>Shift profit</span><b class="${r.profit >= 0 ? 'pos' : 'neg'}">${wmMoney(r.profit)}</b></div>
             </section>
@@ -778,18 +782,18 @@ function showWeekSummary(w)
     const part = (l, v)=> `<div class="lline"><span>${l}</span><b class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</b></div>`;
     openModal(`
         <h2>📊 Week ${w.week} review</h2>
-        <div class="barry">📢 <b>BARRY:</b> ${b.delta >= 4 ? 'The suits upstairs are SMILING. I didn\'t know they could do that.' : b.delta >= 0 ? 'Steady week. The board nods approvingly. Probably.' : b.delta > -6 ? 'Board\'s frowning. Let\'s give them something to smile about.' : 'Uh-oh. I heard the words "performance review" in the lift.'}</div>
+        <div class="barry">📢 <b>BARRY:</b> ${b.delta >= 4 ? 'The suits upstairs are SMILING. I didn\'t know they could do that.' : b.delta >= 0 ? 'Steady week. Head office nods approvingly. Probably.' : b.delta > -6 ? 'Head office\'s frowning. Let\'s give them something to smile about.' : 'Uh-oh. I heard the words "performance review" in the lift.'}</div>
         <div class="mini4">
             <div><small>Avg shipped</small><b>${fmtUnits(b.avgShipped)}</b></div>
             <div><small>Target</small><b>${fmtUnits(b.target)}</b></div>
             <div><small>Week profit</small><b class="${w.profit >= 0 ? 'pos' : 'neg'}">${wmMoney(w.profit)}</b></div>
-            <div><small>League</small><b>${ordinal(leaguePosition())}</b></div>
+            <div><small>Rankings</small><b>${ordinal(leaguePosition())}</b></div>
         </div>
         <p class="small muted">Wages ${wmMoney(L.wages)} · Upkeep ${wmMoney(L.maintenance)} · Incidents ${L.incidents} (${L.serious} serious)</p>
-        <h4>Board confidence ${b.delta >= 0 ? '▲' : '▼'} ${b.delta >= 0 ? '+' : ''}${b.delta} → <b>${b.confidence}%</b></h4>
-        ${part('Volume vs target', b.volScore)}${part('Safety', b.safetyScore)}${part('Profit', b.profitScore)}${part('Staff morale', b.moraleScore)}${part('League position', b.leagueScore)}
+        <h4>Head office confidence ${b.delta >= 0 ? '▲' : '▼'} ${b.delta >= 0 ? '+' : ''}${b.delta} → <b>${b.confidence}%</b></h4>
+        ${part('Volume vs target', b.volScore)}${part('Safety', b.safetyScore)}${part('Profit', b.profitScore)}${part('Staff morale', b.moraleScore)}${part('Rankings position', b.leagueScore)}
         <i class="bar big"><i style="width:${b.confidence}%;background:${b.confidence > 55 ? '#22c55e' : b.confidence > 30 ? '#facc15' : '#ef4444'}"></i></i>
-        ${b.confidence < 25 ? '<p class="neg"><b>⚠️ The board is considering your position.</b></p>' : ''}
+        ${b.confidence < 25 ? '<p class="neg"><b>⚠️ Head office is considering your position.</b></p>' : ''}
         <div class="btnrow"><button class="primary" data-act="continueFlow">Continue ▶</button></div>`, true);
     playSfx(b.delta >= 0 ? 'saved' : 'flowDown', .7);
 }
@@ -799,12 +803,12 @@ function showSeasonEnd(s, skipScene = false)
     if (s.sacked) { career.board.sacked = true; saveCareer(); return showGameOver(s); }
     if (!skipScene && (s.promoted || s.position === 1)) return sceneTrophy(s.position === 1 ? 'champion' : 'promotion', s, ()=> showSeasonEnd(s, true));
     openModal(`
-        <h2>🏁 Season ${s.season} complete</h2>
+        <h2>🏁 Year ${s.season} complete</h2>
         <p class="bigline">You finished <b>${ordinal(s.position)}</b> of 8.</p>
-        ${s.promoted ? `<p class="pos"><b>🏆 PROMOTED to ${esc(tierDef().name)}!</b> Bigger volumes, bigger contracts, tougher board.</p>` : ''}
+        ${s.promoted ? `<p class="pos"><b>🏆 STEPPING UP to ${esc(tierDef().name)}!</b> Bigger volumes, bigger contracts, tougher head office.</p>` : ''}
         <div class="tablewrap"><table class="league">${s.table.map((r, i) => `<tr class="${r.you ? 'you' : ''}"><td>${i + 1}</td><td><i class="sw" style="background:${r.hex}"></i>${esc(r.name)}</td><td><b>${r.points}</b></td></tr>`).join('')}</table></div>
-        <p class="small muted">Staff are a year older. The transfer market has refreshed for pre-season.</p>
-        <div class="btnrow"><button class="primary" data-act="continueFlow">Start season ${career.season} ▶</button></div>`, true);
+        <p class="small muted">Staff are a year older. The jobs board has refreshed for induction week.</p>
+        <div class="btnrow"><button class="primary" data-act="continueFlow">Start year ${career.season} ▶</button></div>`, true);
     playSfx('fanfare', 1);
     particleEffect('confetti', cameraPos.add(vec2(0, 6)), { scale:4 });
 }
@@ -822,10 +826,10 @@ function showGameOver(s)
     setMode('gameover');
     $('#screen').innerHTML = `
     <div class="title">
-        <div class="logo"><span>${career.flags.bankrupt ? '🏦' : '📉'}</span><h1>${career.flags.bankrupt ? 'BANKRUPT' : 'SACKED'}</h1><p>${career.flags.bankrupt ? `The bank has foreclosed on ${esc(career.company)}.` : `The board of ${esc(career.company)} has relieved you of your duties.`}</p></div>
+        <div class="logo"><span>${career.flags.bankrupt ? '🏦' : '📉'}</span><h1>${career.flags.bankrupt ? 'BANKRUPT' : 'P45'}</h1><p>${career.flags.bankrupt ? `The bank has foreclosed on ${esc(career.company)}.` : `Head office of ${esc(career.company)} has relieved you of your duties.`}</p></div>
         <div class="card titleCard">
-            <p>Season ${career.season}, week ${Math.min(career.week, SEASON_WEEKS)} · Board confidence ${career.board.confidence}%</p>
-            <p>Career totals: ${career.records.totalUnits.toLocaleString()} units over ${career.records.shiftsPlayed} shifts · ${career.manager.trophies.length} trophies · ${career.records.fatalities} fatalities.</p>
+            <p>Year ${career.season}, week ${Math.min(career.week, SEASON_WEEKS)} · Head office confidence ${career.board.confidence}%</p>
+            <p>Career totals: ${career.records.totalUnits.toLocaleString()} units over ${career.records.shiftsPlayed} shifts · ${career.manager.trophies.length} awards · ${career.records.fatalities} fatalities.</p>
             <button class="big primary" data-act="restart">Start a new career</button>
         </div>
     </div>`;
@@ -1010,6 +1014,6 @@ function onUiInput(e) { if (e.target.id === 'wageIn') updateChance(); if (WM_CHA
 function onUiKey(e)
 {
     if (wmMode !== 'shift' || !wmSim) return;
-    if (e.code === 'Space') { if (rushView.active) rushView.paused = !rushView.paused; else shiftView.paused = !shiftView.paused; e.preventDefault(); }
+    if (e.code === 'Space') { if (waveView.active) { waveView.paused = !waveView.paused; wvHudUpdate(true); } else shiftView.paused = !shiftView.paused; e.preventDefault(); }
     if (e.key === '1' || e.key === '2' || e.key === '4') { shiftView.speed = +e.key; document.querySelectorAll('[data-act=speed]').forEach(b => b.classList.toggle('on', b.dataset.s === e.key)); }
 }

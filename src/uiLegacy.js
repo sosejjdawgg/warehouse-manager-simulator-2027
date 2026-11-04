@@ -15,7 +15,7 @@ const COMPANY_HEXES = ['#38bdf8', '#f97316', '#22c55e', '#e11d48', '#a855f7', '#
 function staffAva(s, size = 44, mood = 'neutral')
 {
     const z = career?.lineup?.[s.id];
-    const vest = z && z !== 'bench' ? ZONE_DEFS[z].hex : ZONE_DEFS[bestZone(s)].hex;
+    const vest = z === 'op' ? '#ffd23f' : ZONE_DEFS[z] ? ZONE_DEFS[z].hex : ZONE_DEFS[bestZone(s)].hex;
     return `<span class="avaWrap${s.homegrown ? ' hg' : ''}">${avatarSvg(s.look, { size, mood: s.injury ? 'sad' : mood, vest })}${s.homegrown ? '<i class="hgBadge" title="Homegrown">🌱</i>' : ''}</span>`;
 }
 
@@ -114,7 +114,7 @@ function renderAcademy()
     const free = c.flags.freeRecruit;
     return `<div class="grid">
         <section class="card hero academyHero">
-            <h3>🌱 The Academy</h3>
+            <h3>🌱 The Apprentices</h3>
             <p>Hire raw recruits off the street, name them, style them, and train them into legends. Homegrown staff develop <b>35% faster</b>, stay loyal, and follow you to new jobs.</p>
             <div class="mini4">
                 <div><small>Places</small><b>${academyCount()}/${academySlots()}</b></div>
@@ -122,11 +122,11 @@ function renderAcademy()
                 <div><small>Debuts</small><b>${c.records.homegrownDebuts}</b></div>
                 <div><small>Legends</small><b>${alumni.length}</b></div>
             </div>
-            <p class="small">${share >= HOMEGROWN_BOND_SHARE ? '🤝 <b class="pos">Homegrown Bond ACTIVE</b>: +4% speed and −10% accident risk while half the floor is academy-raised.' : `🤝 Field ${Math.round(HOMEGROWN_BOND_SHARE * 100)}%+ homegrown staff to unlock the <b>Homegrown Bond</b> (+4% speed, −10% risk).`}</p>
+            <p class="small">${share >= HOMEGROWN_BOND_SHARE ? '🤝 <b class="pos">Homegrown Bond ACTIVE</b>: +4% speed and −10% accident risk while half the floor is home-grown.' : `🤝 Field ${Math.round(HOMEGROWN_BOND_SHARE * 100)}%+ homegrown staff to unlock the <b>Homegrown Bond</b> (+4% speed, −10% risk).`}</p>
             <div class="btnrow"><button class="primary big" data-act="recruitNew" ${academyCount() >= academySlots() ? 'disabled' : ''}>✚ Recruit new talent · ${free ? 'FREE' : wmMoney(recruitCost())}</button></div>
             <p class="tiny muted">More places with each Training Centre level. Better Training Centre = higher ceilings.</p>
         </section>
-        <section class="card"><h3>Your academy class</h3>
+        <section class="card"><h3>Your apprentice intake</h3>
             ${kids.length ? `<div class="kidGrid">${kids.map(s =>
             {
                 const bz = bestZone(s), pot = s.hidden.potential, ab = staffAbility(s);
@@ -190,7 +190,7 @@ WM_ACTIONS.recruitSign = ()=>
     saveCareer();
     closeModal();
     showHub('academy');
-    showCinematicOnce({ key:'homegrownDebut', detail:`${displayName(d)} signs for the academy!` }, '✍️', 'Welcome to the crew!');
+    showCinematicOnce({ key:'homegrownDebut', detail:`${displayName(d)} joins the apprentice scheme!` }, '✍️', 'Welcome to the crew!');
 };
 WM_CHANGE.dAge = (el)=> { const v = document.getElementById('dAgeV'); if (v) v.textContent = el.value; };
 
@@ -259,19 +259,19 @@ function renderCareer()
             <div class="mini4">
                 <div><small>Your wallet</small><b>${wmMoney(m.wallet)}</b></div>
                 <div><small>${m.owner ? 'Income' : 'Salary'}</small><b>${m.owner ? 'Dividends' : wmMoney(managerSalary()) + '/wk'}</b></div>
-                <div><small>Seasons</small><b>${c.season}</b></div>
-                <div><small>Trophies</small><b>${m.trophies.length}</b></div>
+                <div><small>Years</small><b>${c.season}</b></div>
+                <div><small>Awards</small><b>${m.trophies.length}</b></div>
             </div>
-            <p class="small muted">Excel and the industry notices: high reputation brings job offers from bigger companies at the end of each season. Save ${wmMoney(OWN_COMPANY_COST)} and you can found your own warehouse.</p>
+            <p class="small muted">Excel and the industry notices: high reputation brings job offers from bigger companies at the end of each year. Save ${wmMoney(OWN_COMPANY_COST)} and you can found your own warehouse.</p>
             ${!m.owner ? `<div class="btnrow"><button class="${canFoundCompany() ? 'primary big' : ''}" data-act="foundDlg" ${canFoundCompany() ? '' : 'disabled'}>🏗️ Found your own warehouse ${canFoundCompany() ? '' : `(${wmMoney(OWN_COMPANY_COST - m.wallet)} to go)`}</button></div>` : ''}
         </section>
         ${offers.length ? `<section class="card warnCard"><h3>💼 Job offers on the table</h3>${offers.map(offerCard).join('')}</section>` : ''}
-        <section class="card"><h3>🏆 Trophy cabinet</h3>${m.trophies.length ? m.trophies.map(t => `<p class="trophy">🏆 ${esc(t)}</p>`).join('') : '<p class="muted">Empty… for now.</p>'}</section>
+        <section class="card"><h3>🏆 Award cabinet</h3>${m.trophies.length ? m.trophies.map(t => `<p class="trophy">🏆 ${esc(t)}</p>`).join('') : '<p class="muted">Empty… for now.</p>'}</section>
         <section class="card"><h3>📜 Career history</h3>
-            ${[...m.history, { company:c.company, tier:c.tier, seasons:(c.flags.stintSeasons || 0) + 1, owner:m.owner, current:true }].map(h => `<p>${h.owner ? '👑' : '💼'} <b>${esc(h.company)}</b> · ${TIER_DEFS[h.tier].name} · ${h.seasons} season${h.seasons > 1 ? 's' : ''}${h.current ? ' <em class="pos">(current)</em>' : ''}</p>`).join('')}
+            ${[...m.history, { company:c.company, tier:c.tier, seasons:(c.flags.stintSeasons || 0) + 1, owner:m.owner, current:true }].map(h => `<p>${h.owner ? '👑' : '💼'} <b>${esc(h.company)}</b> · ${TIER_DEFS[h.tier].name} · ${h.seasons} year${h.seasons > 1 ? 's' : ''}${h.current ? ' <em class="pos">(current)</em>' : ''}</p>`).join('')}
         </section>
         <section class="card memorial"><h3>🕯️ Memorial wall</h3>
-            ${c.memorial.length ? c.memorial.map(x => `<div class="mem">${avatarSvg(x.look, { size:48, mood:'neutral', vest:'#64748b' })}<div><b>${esc(x.name)}</b><small>${x.age} · ${esc(x.company)} · S${x.season} W${x.week}${x.homegrown ? ' · 🌱 academy' : ''}</small><small>${esc(x.cause)}</small></div></div>`).join('') : '<p class="muted">No one has died under your management. Keep it that way.</p>'}
+            ${c.memorial.length ? c.memorial.map(x => `<div class="mem">${avatarSvg(x.look, { size:48, mood:'neutral', vest:'#64748b' })}<div><b>${esc(x.name)}</b><small>${x.age} · ${esc(x.company)} · S${x.season} W${x.week}${x.homegrown ? ' · 🌱 apprentice scheme' : ''}</small><small>${esc(x.cause)}</small></div></div>`).join('') : '<p class="muted">No one has died under your management. Keep it that way.</p>'}
             <p class="small">Fatalities: <b>${c.records.fatalities}</b> · Best accident-free run: <b>${c.records.bestSafeRun}</b> shifts</p>
         </section>
     </div>`;
@@ -334,8 +334,8 @@ function showOffersModal(reason)
     openModal(`
         <div class="offerHead">${avatarSvg(castLook('holt'), { size:90, mood:'happy', vest:CAST.holt.vest, hat:false })}
         <div><h2>💼 ${reason === 'sacked' ? 'Down, but not out' : 'Your phone is ringing'}</h2>
-        <p>${reason === 'sacked' ? `Dana Holt, head-hunter: "Bad luck at ${esc(career.company)}. But I've still got people who want you."` : `Dana Holt, head-hunter: "Your season didn't go unnoticed. These companies want you."`}</p></div></div>
+        <p>${reason === 'sacked' ? `Dana Holt, head-hunter: "Bad luck at ${esc(career.company)}. But I've still got people who want you."` : `Dana Holt, head-hunter: "Your year didn't go unnoticed. These companies want you."`}</p></div></div>
         ${offers.map(offerCard).join('')}
-        <div class="btnrow">${reason === 'sacked' ? '<button class="danger" data-act="restart">Retire (new career)</button>' : `<button data-act="offersDecline">Stay loyal to ${esc(career.company)} (board +6)</button>`}</div>`, true);
+        <div class="btnrow">${reason === 'sacked' ? '<button class="danger" data-act="restart">Retire (new career)</button>' : `<button data-act="offersDecline">Stay loyal to ${esc(career.company)} (head office +6)</button>`}</div>`, true);
     playSfx('perfect', .8);
 }

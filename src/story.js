@@ -10,7 +10,7 @@
 const CAST =
 {
     gus:     { name:'Gus Pemberton',   role:'Outgoing manager',     look:{ skin:1, hair:7, style:5, hat:0, acc:2 }, vest:'#3ec1ff' },
-    vale:    { name:'Margaret Vale',   role:'Chair of the Board',   look:{ skin:0, hair:7, style:3, hat:5, acc:1 }, vest:'#7c3aed', hat:false },
+    vale:    { name:'Margaret Vale',   role:'Managing Director',   look:{ skin:0, hair:7, style:3, hat:5, acc:1 }, vest:'#7c3aed', hat:false },
     dunn:    { name:'Inspector Dunn',  role:'Health & Safety Exec', look:{ skin:3, hair:0, style:2, hat:5, acc:1 }, vest:'#ffd23f' },
     tasha:   { name:'Tasha Grant',     role:'Union rep',            look:{ skin:4, hair:5, style:1, hat:3, acc:5 }, vest:'#ef4444' },
     priya:   { name:'Priya Shah',      role:'MegaCart account lead',look:{ skin:2, hair:0, style:4, hat:6, acc:0 }, vest:'#ec4899', hat:false },
@@ -32,7 +32,7 @@ const FX =
 {
     cash(v) { career.cash += v; if (v < 0) career.weekLedger.other -= v; else career.weekLedger.revenue += v; return [`${v >= 0 ? '+' : ''}${wmMoney(v)}`, v >= 0]; },
     morale(v, filter = ()=> true) { for (const s of career.staff.filter(filter)) s.morale = clamp(s.morale + v, 0, 100); return [`Morale ${v >= 0 ? '+' : ''}${v}`, v >= 0]; },
-    board(v) { if (career.manager.owner) return null; career.board.confidence = clamp(career.board.confidence + v, 0, 100); return [`Board ${v >= 0 ? '+' : ''}${v}`, v >= 0]; },
+    board(v) { if (career.manager.owner) return null; career.board.confidence = clamp(career.board.confidence + v, 0, 100); return [`Head office ${v >= 0 ? '+' : ''}${v}`, v >= 0]; },
     rep(v) { career.manager.rep = clamp(career.manager.rep + v, 0, 100); return [`Reputation ${v >= 0 ? '+' : ''}${v}`, v >= 0]; },
     wallet(v) { career.manager.wallet += v; return [`Your wallet ${v >= 0 ? '+' : ''}${wmMoney(v)}`, v >= 0]; },
     mod(key, value, shifts, label) { addMod(key, value, shifts, label); const good = key === 'risk' ? value < 1 : value > 1; return [`${label} (${shifts} shifts)`, good]; },
@@ -51,19 +51,19 @@ const STORY =
         point:'start', bg:'dawn', cast:['gus', 'you'],
         lines:()=> [
             ['gus', 'happy', `So you're the new boss of ${career.company}? Thirty-one years I ran this floor. Thirty-one!`],
-            ['gus', 'neutral', `The board wants volume. The crew wants respect. The forklifts want blood. You can't give everyone everything.`],
+            ['gus', 'neutral', `Head office wants volume. The crew wants respect. The forklifts want blood. You can't give everyone everything.`],
             ['gus', 'sad', `We haven't gone a full month without someone getting hurt in years. Old Harry still limps from the racking collapse.`],
             ['you', 'neutral', `What would you do differently, Gus?`],
             ['gus', 'neutral', `Doesn't matter what I'd do. What kind of manager are YOU going to be?`],
         ],
         choices:[
-            { label:'⚡ "Speed is king."', desc:'Faster crew for 15 shifts, but riskier. The board likes ambition.',
+            { label:'⚡ "Speed is king."', desc:'Faster crew for 15 shifts, but riskier. Head office likes ambition.',
               fx:()=> [FX.mod('speed', 1.06, 15, 'Hustle culture: +6% speed'), FX.mod('risk', 1.15, 15, 'Cutting corners: +15% risk'), FX.board(5), FX.flag('philosophy', 'speed')],
               result:`Gus whistles. "Ambitious. Just make sure you still know everyone's name by Christmas."` },
             { label:'🦺 "Nobody gets hurt on my watch."', desc:'Safer floor for 15 shifts. The crew trusts you.',
               fx:()=> [FX.mod('risk', .8, 15, 'Safety culture: −20% risk'), FX.morale(5), FX.board(-3), FX.flag('philosophy', 'safety')],
               result:`Gus smiles for the first time. "Harry would've liked you."` },
-            { label:'🤝 "My people come first."', desc:'Big morale boost and a homegrown academy place on the house.',
+            { label:'🤝 "My people come first."', desc:'Big morale boost and an apprentice place on the house.',
               fx:()=> [FX.morale(10), FX.cash(-1500), FX.flag('philosophy', 'people'), FX.flag('freeRecruit')],
               result:`"Then start by building your own crew. Kids off the street, trained your way. That's how legends are made."` },
         ],
@@ -76,8 +76,8 @@ const STORY =
             ['vale', 'angry', `I need a number to take to the shareholders. Can you promise me 10% above target by week 4?`],
         ],
         choices:[
-            { label:'"You\'ll have it."', desc:'Board +8 now. Miss it by week 4 and they will remember.', fx:()=> [FX.board(8), FX.flag('promiseVolume', true)], result:`"Good. I'll hold you to that."` },
-            { label:'"Let me find my feet first."', desc:'Board −3, no pressure.', fx:()=> [FX.board(-3)], result:`"Hmm. Cautious. We'll see if that's wisdom or weakness."` },
+            { label:'"You\'ll have it."', desc:'Head office +8 now. Miss it by week 4 and they will remember.', fx:()=> [FX.board(8), FX.flag('promiseVolume', true)], result:`"Good. I'll hold you to that."` },
+            { label:'"Let me find my feet first."', desc:'Head office −3, no pressure.', fx:()=> [FX.board(-3)], result:`"Hmm. Cautious. We'll see if that's wisdom or weakness."` },
         ],
     },
     promiseCheck:
@@ -104,11 +104,11 @@ const STORY =
             ['asst', 'shocked', `(whispering) Boss, we could tidy the logs before she reads them properly...`],
         ],
         choices:[
-            { label:'📋 Full transparency', desc:'Pay a $2,500 fine. Safer floor for 20 shifts, reputation up.',
+            { label:'📋 Full transparency', desc:'Pay a £2,500 fine. Safer floor for 20 shifts, reputation up.',
               fx:()=> [FX.cash(-2500), FX.mod('risk', .88, 20, 'Inspection fixes: −12% risk'), FX.rep(4), FX.flag('clean')], result:`Dunn nods slowly. "Honesty. Rare in this industry. Fix it and I won't need to come back."` },
             { label:'🧹 "Tidy" the logs', desc:'No fine today... but cover-ups have a way of surfacing.',
               fx:()=> [FX.flag('coverup'), FX.board(3)], result:`The inspector leaves satisfied. Your assistant won't meet your eye for the rest of the day.` },
-            { label:'🏗️ Commission a safety overhaul', desc:'$8,000: Safety Systems +1 level, morale up.',
+            { label:'🏗️ Commission a safety overhaul', desc:'£8,000: Safety Systems +1 level, morale up.',
               fx:()=> [FX.cash(-8000), FX.facility('safety'), FX.morale(4), FX.rep(2)], result:`Contractors arrive by lunch. New guard rails, new signage, new beacons on every forklift.` },
         ],
     },
@@ -123,7 +123,7 @@ const STORY =
             { label:'✊ Recognise the union', desc:'Wages +8%, morale +12, crew waits more patiently at crossings.',
               fx:()=> [FX.wages(.08), FX.morale(12), FX.mod('risk', .9, 25, 'Union safety reps: −10% risk'), FX.flag('unionDone'), FX.board(-4)], result:`Cheers echo through the break room. Tasha shakes your hand: "You won't regret this."` },
             { label:'🤝 Negotiate', desc:'Wages +4%, morale +5.', fx:()=> [FX.wages(.04), FX.morale(5), FX.flag('unionDone')], result:`A compromise. Nobody's thrilled, nobody's marching.` },
-            { label:'🚫 Refuse', desc:'Board loves it. The crew does not. Expect trouble.', fx:()=> [FX.morale(-10), FX.board(6), FX.flag('unionDone'), FX.flag('strikeThreat', career.week)], result:`Tasha's jaw tightens. "Then we'll see how your parcels move without us."` },
+            { label:'🚫 Refuse', desc:'Head office loves it. The crew does not. Expect trouble.', fx:()=> [FX.morale(-10), FX.board(6), FX.flag('unionDone'), FX.flag('strikeThreat', career.week)], result:`Tasha's jaw tightens. "Then we'll see how your parcels move without us."` },
         ],
     },
     strike:
@@ -131,7 +131,7 @@ const STORY =
         point:'postShift', when:()=> career.flags.strikeThreat && career.week !== career.flags.strikeThreat, bg:'dusk', cast:['tasha', 'you'],
         lines:()=> [['tasha', 'angry', `The ballot's in. 84% for strike action. From tomorrow, the floor is empty — unless you change your mind.`]],
         choices:[
-            { label:'Concede: wages +10%', desc:'Crisis over. Morale +15. The board sighs.', fx:()=> [FX.wages(.1), FX.morale(15), FX.board(-6), FX.flag('strikeThreat', false)], result:`The crew returns singing. Tasha winks at you on the way past.` },
+            { label:'Concede: wages +10%', desc:'Crisis over. Morale +15. Head office sighs.', fx:()=> [FX.wages(.1), FX.morale(15), FX.board(-6), FX.flag('strikeThreat', false)], result:`The crew returns singing. Tasha winks at you on the way past.` },
             { label:'Bring in agency temps', desc:'Volume −30% and risk ×1.6 for 4 shifts. Morale −15.',
               fx:()=> [FX.mod('speed', .7, 4, 'Strike: agency temps −30% speed'), FX.mod('risk', 1.6, 4, 'Untrained temps: +60% risk'), FX.morale(-15), FX.rep(-5), FX.flag('strikeThreat', false)], result:`Coaches of bewildered temps arrive at 5am. Nobody knows where anything is.` },
         ],
@@ -140,7 +140,7 @@ const STORY =
     {
         point:'postShift', when:()=> career.week === 6 && !career.flags['client' + career.season], bg:'office', cast:['priya', 'you'],
         lines:()=> [
-            ['priya', 'happy', `MegaCart's peak season is coming and our usual partner just collapsed. We need a warehouse that can take a beating.`],
+            ['priya', 'happy', `MegaCart's peak is coming and our usual partner just collapsed. We need a warehouse that can take a beating.`],
             ['priya', 'neutral', `25% more volume, every shift, through peak. We pay well. We also penalise late parcels... aggressively.`],
         ],
         choices:[
@@ -170,7 +170,7 @@ const STORY =
             ['kat', 'shocked', `Someone filmed ${career.flags.pendingViral} dodging a forklift at your site. Two million views and climbing. Comment?`],
         ],
         choices:[
-            { label:'🙇 Apologise & retrain everyone', desc:'$3,000. Risk −15% for 12 shifts. Rep +2.', fx:()=> [FX.cash(-3000), FX.mod('risk', .85, 12, 'Crossing retraining: −15% risk'), FX.rep(2), FX.flag('pendingViral', false)], result:`Every worker spends an hour watching the clip with a trainer. Nobody jaywalks for a while.` },
+            { label:'🙇 Apologise & retrain everyone', desc:'£3,000. Risk −15% for 12 shifts. Rep +2.', fx:()=> [FX.cash(-3000), FX.mod('risk', .85, 12, 'Crossing retraining: −15% risk'), FX.rep(2), FX.flag('pendingViral', false)], result:`Every worker spends an hour watching the clip with a trainer. Nobody jaywalks for a while.` },
             { label:'🤷 "Fake news."', desc:'Free. Rep −5.', fx:()=> [FX.rep(-5), FX.flag('pendingViral', false)], result:`The comments section is brutal.` },
         ],
     },
@@ -181,15 +181,15 @@ const STORY =
             const t = career.flags.pendingTragedy;
             return [
                 ['asst', 'sad', `...The paramedics did everything they could. ${t.name} was ${t.cause}.`],
-                ['asst', 'sad', t.homegrown ? `${t.name.split(' ')[0]} came up through our academy. Some of the kids trained alongside them. They're... not okay.` : `The crew is outside. Nobody wants to go back in.`],
+                ['asst', 'sad', t.homegrown ? `${t.name.split(' ')[0]} came up through our apprentice scheme. Some of the kids trained alongside them. They're... not okay.` : `The crew is outside. Nobody wants to go back in.`],
                 ['you', 'sad', `...`],
-                ['asst', 'neutral', `The board is on line one. The press is on line two. What do we do?`],
+                ['asst', 'neutral', `Head office is on line one. The press is on line two. What do we do?`],
             ];
         },
         choices:[
             { label:'🕯️ Close for a day of mourning', desc:'Lose a shift of revenue. Morale recovers. Reputation +3.', fx:()=> [FX.cash(-Math.round(tierDef().volume * UNITS_PER_PARCEL * tierDef().rate * .9)), FX.morale(12), FX.rep(3), FX.board(-4), FX.flag('pendingTragedy', false)], result:`The gates stay shut. Flowers pile up against the fence by the dock.` },
-            { label:'🏭 Keep the line moving', desc:'Board +4. The crew will never forget this. Morale −12, rep −6.', fx:()=> [FX.board(4), FX.morale(-12), FX.rep(-6), FX.flag('pendingTragedy', false)], result:`The conveyors restart at 6am. Nobody speaks all shift.` },
-            { label:'🛡️ Fund a memorial safety programme', desc:'$15,000: Safety Systems +1, −20% risk for 30 shifts, morale +6.', fx:()=> [FX.cash(-15000), FX.facility('safety'), FX.mod('risk', .8, 30, 'Memorial safety programme: −20% risk'), FX.morale(6), FX.rep(5), FX.flag('pendingTragedy', false)], result:`A plaque goes up by the break room. Below the name: "Never again."` },
+            { label:'🏭 Keep the line moving', desc:'Head office +4. The crew will never forget this. Morale −12, rep −6.', fx:()=> [FX.board(4), FX.morale(-12), FX.rep(-6), FX.flag('pendingTragedy', false)], result:`The conveyors restart at 6am. Nobody speaks all shift.` },
+            { label:'🛡️ Fund a memorial safety programme', desc:'£15,000: Safety Systems +1, −20% risk for 30 shifts, morale +6.', fx:()=> [FX.cash(-15000), FX.facility('safety'), FX.mod('risk', .8, 30, 'Memorial safety programme: −20% risk'), FX.morale(6), FX.rep(5), FX.flag('pendingTragedy', false)], result:`A plaque goes up by the break room. Below the name: "Never again."` },
         ],
     },
     debut:
@@ -199,7 +199,7 @@ const STORY =
             const s = career.staff.find(x => x.id === career.flags.pendingDebut);
             career.flags.debutName = s ? displayName(s) : 'the kid';
             return [
-                ['gus', 'happy', `Popped in to see the academy kid's first shift. ${career.flags.debutName}! Reminds me of me, forty years and two knees ago.`],
+                ['gus', 'happy', `Popped in to see the apprentice's first shift. ${career.flags.debutName}! Reminds me of me, forty years and two knees ago.`],
                 ['gus', 'neutral', `How you treat them now decides who they become. Spotlight, or graft?`],
             ];
         },
@@ -216,8 +216,8 @@ const STORY =
             ['rupert', 'happy', `I've driven a golf buggy. How different can a forklift be?`],
         ],
         choices:[
-            { label:'✅ Hire Rupert', desc:'Board +10. Rupert is accident-prone and bad at everything.', fx:()=> { const s = makeStaff({ quality:4, age:24, zone:'green', scouted:true, name:'Rupert Vale' }); s.traits = ['Accident-Prone', 'Lazy']; s.look = castLook('rupert'); s.wage = 600; s.contractWeeks = 52; career.staff.push(s); career.lineup[s.id] = 'bench'; return [FX.board(10), FX.flag('nephewDone'), ['Rupert joins the crew', false]]; }, result:`Rupert immediately reverses into a pallet of toilet roll. "Totally fine!"` },
-            { label:'❌ Politely decline', desc:'Board −6.', fx:()=> [FX.board(-6), FX.flag('nephewDone')], result:`Margaret's smile doesn't reach her eyes. "Of course. I understand."` },
+            { label:'✅ Hire Rupert', desc:'Head office +10. Rupert is accident-prone and bad at everything.', fx:()=> { const s = makeStaff({ quality:4, age:24, zone:'green', scouted:true, name:'Rupert Vale' }); s.traits = ['Accident-Prone', 'Lazy']; s.look = castLook('rupert'); s.wage = 600; s.contractWeeks = 52; career.staff.push(s); career.lineup[s.id] = 'bench'; return [FX.board(10), FX.flag('nephewDone'), ['Rupert joins the crew', false]]; }, result:`Rupert immediately reverses into a pallet of toilet roll. "Totally fine!"` },
+            { label:'❌ Politely decline', desc:'Head office −6.', fx:()=> [FX.board(-6), FX.flag('nephewDone')], result:`Margaret's smile doesn't reach her eyes. "Of course. I understand."` },
         ],
     },
     scandal:
@@ -228,19 +228,19 @@ const STORY =
             ['dunn', 'angry', `I trusted you. Now I'm back — with a warrant.`],
         ],
         choices:[
-            { label:'Take responsibility', desc:'Fine $12,000. Board −15, rep −8.', fx:()=> [FX.cash(-12000), FX.board(-15), FX.rep(-8), FX.flag('coverup', false)], result:`You face the cameras. It's the worst day of your career, but it's over.` },
-            { label:'Blame your assistant', desc:'Fine $6,000. Rep −12. Your assistant gets less reliable.', fx:()=> { career.assistant.quality = Math.max(.25, career.assistant.quality - .15); return [FX.cash(-6000), FX.rep(-12), FX.flag('coverup', false), ['Assistant reliability −15%', false]]; }, result:`Your assistant clears their desk in silence. The crew noticed.` },
+            { label:'Take responsibility', desc:'Fine £12,000. Head office −15, rep −8.', fx:()=> [FX.cash(-12000), FX.board(-15), FX.rep(-8), FX.flag('coverup', false)], result:`You face the cameras. It's the worst day of your career, but it's over.` },
+            { label:'Blame your assistant', desc:'Fine £6,000. Rep −12. Your assistant gets less reliable.', fx:()=> { career.assistant.quality = Math.max(.25, career.assistant.quality - .15); return [FX.cash(-6000), FX.rep(-12), FX.flag('coverup', false), ['Assistant reliability −15%', false]]; }, result:`Your assistant clears their desk in silence. The crew noticed.` },
         ],
     },
     peakPep:
     {
         point:'preShift', when:()=> career.week === PEAK_WEEKS[0] && (career.day - 1) % WEEK_SHIFTS === 0 && !career.flags['peak' + career.season], bg:'floor', cast:['you', 'asst'],
         lines:()=> [
-            ['asst', 'shocked', `Peak season starts NOW. The trucks are queuing round the block. The crew's looking at you, boss.`],
+            ['asst', 'shocked', `Peak starts NOW. The trucks are queuing round the block. The crew's looking at you, boss.`],
             ['you', 'neutral', `(Everyone gathers by the dock. Time for a speech.)`],
         ],
         choices:[
-            { label:'🍕 "Pizza\'s on me!"', desc:'$700. Morale +8.', fx:()=> [FX.cash(-700), FX.morale(8), FX.flag('peak' + career.season)], result:`Forty pizzas. The crew demolishes them in four minutes flat.` },
+            { label:'🍕 "Pizza\'s on me!"', desc:'£700. Morale +8.', fx:()=> [FX.cash(-700), FX.morale(8), FX.flag('peak' + career.season)], result:`Forty pizzas. The crew demolishes them in four minutes flat.` },
             { label:'💷 "Double-time bonus if we hit target!"', desc:'Speed +8% for 10 shifts. Wages +3%.', fx:()=> [FX.mod('speed', 1.08, 10, 'Bonus fever: +8% speed'), FX.wages(.03), FX.flag('peak' + career.season)], result:`"DOUBLE TIME! DOUBLE TIME!" The chant echoes off the racking.` },
             { label:'😤 "Just get it done."', desc:'Speed +5% but risk +10% for 10 shifts.', fx:()=> [FX.mod('speed', 1.05, 10, 'Pressure: +5% speed'), FX.mod('risk', 1.1, 10, 'Pressure: +10% risk'), FX.flag('peak' + career.season)], result:`Grim nods. The crew turns to face the trucks.` },
         ],
@@ -250,12 +250,12 @@ const STORY =
         point:'seasonEnd', when:(ctx)=> ctx?.promoted, bg:'party', cast:['vale', 'you'],
         lines:()=> career.manager.owner
             ? [['you', 'happy', `We did it! ${career.company} is moving up to a ${tierDef().name}. Our own company, our own crew!`]]
-            : [['vale', 'happy', `Promotion! ${career.company} becomes a ${tierDef().name}. The shareholders want to buy you a boat.`],
+            : [['vale', 'happy', `Contract win! ${career.company} becomes a ${tierDef().name}. The shareholders want to buy you a boat.`],
                ['vale', 'neutral', `How shall we celebrate?`]],
         choices:[
-            { label:'🎉 Bonuses for the whole crew', desc:'$250 each. Morale +12.', fx:()=> [FX.cash(-250 * career.staff.length), FX.morale(12)], result:`Confetti cannons. Somebody drives a forklift through a balloon arch.` },
+            { label:'🎉 Bonuses for the whole crew', desc:'£250 each. Morale +12.', fx:()=> [FX.cash(-250 * career.staff.length), FX.morale(12)], result:`Confetti cannons. Somebody drives a forklift through a balloon arch.` },
             { label:'🏗️ Reinvest everything', desc:'Free upgrade: Racking & Capacity +1.', fx:()=> [FX.facility('racking'), FX.board(4)], result:`New racking goes up over the summer, higher than ever before.` },
-            { label:'💼 Negotiate my own bonus', desc:'Your wallet +$12,000. Board −4.', fx:()=> [FX.wallet(12000), FX.board(-4)], result:`Margaret raises an eyebrow, then signs the cheque.` },
+            { label:'💼 Negotiate my own bonus', desc:'Your wallet +£12,000. Head office −4.', fx:()=> [FX.wallet(12000), FX.board(-4)], result:`Margaret raises an eyebrow, then signs the cheque.` },
         ],
     },
     foundIdea:

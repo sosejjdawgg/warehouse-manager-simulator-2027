@@ -83,8 +83,8 @@ function perkText(p)
     if (k.revenue) out.push(`+${Math.round((k.revenue - 1) * 100)}% revenue`);
     if (k.wages) out.push(`${Math.round((k.wages - 1) * 100)}% wage bill`);
     if (k.morale) out.push(`+${k.morale} crew morale`);
-    if (k.recruit) out.push(`${Math.round((k.recruit - 1) * 100)}% academy recruit cost`);
-    if (k.train) out.push(`+${Math.round((k.train - 1) * 100)}% academy development`);
+    if (k.recruit) out.push(`${Math.round((k.recruit - 1) * 100)}% apprentice recruit cost`);
+    if (k.train) out.push(`+${Math.round((k.train - 1) * 100)}% apprentice development`);
     return out.length ? `<div class="notes mods">${out.map(t => `<span class="${/^-|^\+\d+% crew|revenue|morale|development/.test(t) && !/risk/.test(t) || /^-\d+% accident/.test(t) ? 'good' : 'bad'}">${t}</span>`).join('')}</div>` : '';
 }
 WM_ACTIONS.selectMgr = ()=> { playSfx('perfect', .8); showManagerSelect(); };

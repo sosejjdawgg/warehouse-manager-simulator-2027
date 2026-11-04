@@ -23,7 +23,7 @@ function gameInit()
 ///////////////////////////////////////////////////////////////////////////////
 function gameUpdate()
 {
-    if (wmMode === 'shift') (rushView.active ? rushView : shiftView).update();
+    if (wmMode === 'shift') (waveView.active ? waveView : shiftView).update();
     else
     {
         // calm animated backdrop behind the management screens
@@ -38,7 +38,7 @@ function gameUpdatePost() {}
 ///////////////////////////////////////////////////////////////////////////////
 function gameRender()
 {
-    if (wmMode === 'shift') { (rushView.active ? rushView : shiftView).render(); return; }
+    if (wmMode === 'shift') { (waveView.active ? waveView : shiftView).render(); return; }
     // backdrop: a sunny, bouncy parade of parcels on conveyor belts
     const ctx = NX.world();
     const lanes = 7;
@@ -62,7 +62,7 @@ function gameRender()
 ///////////////////////////////////////////////////////////////////////////////
 function gameRenderPost()
 {
-    if (wmMode === 'shift') (rushView.active ? rushView : shiftView).renderPost();
+    if (wmMode === 'shift') (waveView.active ? waveView : shiftView).renderPost();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

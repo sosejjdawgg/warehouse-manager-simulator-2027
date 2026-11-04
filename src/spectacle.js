@@ -16,9 +16,9 @@ const pickOne = (a)=> a[Math.floor(Math.random() * a.length)];
 const BARRY =
 {
     intro:     ['Good morning, {co}! Coffee down, hard hats ON!', 'Rise and shine, legends! The trucks are already queuing!', 'Another day, another {target} units. Let\'s make it look easy!', 'Right then, people. Same rules as always: nobody dies, everything ships.'],
-    introPeak: ['IT\'S PEAK SEASON! I can SEE the trucks from my window and they do NOT stop!', 'Peak week, people! Stretch those hamstrings!'],
+    introPeak: ['IT\'S PEAK! I can SEE the trucks from my window and they do NOT stop!', 'Peak week, people! Stretch those hamstrings!'],
     introRisky:['Crew looks a bit ropey today… eyes open, please. I mean it.', 'Safety first today, yeah? I don\'t want to fill in another form.'],
-    introHg:   ['Half the floor came through the academy. Proud dad moment, this.', 'Homegrown heroes on the floor today! Show \'em how it\'s done!'],
+    introHg:   ['Half the floor came through the apprentice scheme. Proud dad moment, this.', 'Homegrown heroes on the floor today! Show \'em how it\'s done!'],
     end: { S:['UNBELIEVABLE! Somebody frame that shift!', 'PERFECT! I\'m not crying, you\'re crying!'], A:['Cracking shift, everyone. Cracking!', 'That\'s how we do it at {co}!'],
            B:['Solid stuff. Not spectacular. But solid.', 'Job done. Go home, hug your sofa.'], C:['We got there… mostly.', 'Bit of a scrappy one, that.'],
            D:['Well. Tomorrow\'s another day.', 'I\'ve seen better shifts from a vending machine.'], F:['Let\'s… never speak of this shift again.', 'Oh dear. Oh dear oh dear.'] },
@@ -39,7 +39,7 @@ const BARKS =
     perfect:  ['Smooth!', 'Nailed it!', 'Like butter!', 'Chef\'s kiss!', 'Easy peasy!'],
     breakTime:['Lunch!', 'Sandwich time!', 'Back in 15!', 'Brew o\'clock!'],
     jam:      ['It\'s piling up!', 'Help over here!', 'Too many boxes!', 'SOS!'],
-    target:   ['WE DID IT!', 'Woohoo!', 'GET IN!', 'Champions!'],
+    target:   ['WE DID IT!', 'Woohoo!', 'GET IN!', 'Smashed it!'],
     idle:     ['Anyone seen my scanner?', 'Who stacked this?', 'Smells like toast…', 'Did you see the match?', 'Box. Box. Box. Box.', 'I love tape.'],
     injury:   ['MEDIC!', 'Someone help!', 'Oh no!'],
     // trait overrides (key:trait)
@@ -53,7 +53,7 @@ const BARKS =
     'idle:Ambitious':      ['I\'ll be manager one day.', 'Watch and learn.'],
     'idle:Moody':          ['Leave me alone.', 'Everything is cardboard.'],
     'idle:Perfectionist':  ['That label is 2mm off.', 'Neat. Very neat.'],
-    'idle:homegrown':      ['For the academy!', 'Learned that from the best!', 'Proud to be here!'],
+    'idle:homegrown':      ['For the apprentice scheme!', 'Learned that from the best!', 'Proud to be here!'],
     'jaywalk:Steady':      ['…I\'ll wait. Patience.'],
 };
 function barkLine(kind, s)
@@ -152,7 +152,7 @@ function coachTip(key)
     el.className = 'show';
     el.onclick = ()=> el.className = '';
     clearTimeout(el._t);
-    el._t = setTimeout(()=> el.className = '', typeof rushView !== 'undefined' && rushView.active ? 5000 : 7000);
+    el._t = setTimeout(()=> el.className = '', typeof waveView !== 'undefined' && waveView.active ? 5000 : 7000);
     playSfx('perfect', .5, 1.3);
 }
 
