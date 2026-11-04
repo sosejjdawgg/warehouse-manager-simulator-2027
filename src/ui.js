@@ -500,7 +500,7 @@ function showPreshift()
             </section>
         </div>
         <footer class="startbar">
-            <button class="ghost" data-act="simulate">⏩ Simulate shift</button>
+            <button class="ghost" data-act="simulate">⏩ Let the assistant run it</button>
             <button class="big primary" data-act="startShift">▶ Start shift</button>
         </footer>
     </div>`;
@@ -527,13 +527,13 @@ function startShift(skipStory = false)
     closeModal();
     const sid = !skipStory && storyNext('preShift');
     if (sid) return playStory(sid, ()=> startShift(true));
-    wmSim = new ShiftSim(career, { simulated:false });
+    wmSim = new RushSim(career);
     sceneShiftIntro(wmSim, ()=>
     {
         setMode('shift');
-        buildHud();
-        shiftView.start(wmSim);
-        coachTip('start');
+        buildRushHud();
+        rushView.start(wmSim);
+        if (!career.flags.rushHelpSeen) rushHelp();
     });
 }
 function simulateShift(skipStory = false)
@@ -554,7 +554,7 @@ function finishShift()
 {
     if (!wmSim) return;
     const res = wmSim.result();
-    shiftView.stop();
+    if (wmSim instanceof RushSim) rushView.stop(); else shiftView.stop();
     const week = applyShiftResult(res);
     wmSim = null;
     saveCareer();
@@ -1010,6 +1010,6 @@ function onUiInput(e) { if (e.target.id === 'wageIn') updateChance(); if (WM_CHA
 function onUiKey(e)
 {
     if (wmMode !== 'shift' || !wmSim) return;
-    if (e.code === 'Space') { shiftView.paused = !shiftView.paused; e.preventDefault(); }
+    if (e.code === 'Space') { if (rushView.active) rushView.paused = !rushView.paused; else shiftView.paused = !shiftView.paused; e.preventDefault(); }
     if (e.key === '1' || e.key === '2' || e.key === '4') { shiftView.speed = +e.key; document.querySelectorAll('[data-act=speed]').forEach(b => b.classList.toggle('on', b.dataset.s === e.key)); }
 }

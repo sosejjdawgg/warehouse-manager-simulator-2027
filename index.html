@@ -436,6 +436,12 @@ img.pix,.ava.pix,#pxscene{image-rendering:pixelated;image-rendering:crisp-edges}
 #story .txt{font-weight:700;letter-spacing:.02em}
 #story .choice{background:#fffdf5}
 #coach .ava.pix{border-radius:8px}
+body.rushOn #coach{bottom:auto;top:calc(70px + env(safe-area-inset-top));transform:translate(-50%,-260%)}
+body.rushOn #coach.show{transform:translate(-50%,0);pointer-events:none}
+body.rushOn #coach{width:min(440px,92vw);padding:5px 10px;opacity:.96}
+body.rushOn #coach .ava{width:40px;height:40px}
+body.rushOn #coach p{font-size:13px;line-height:1.25}
+@media (max-width:760px){body.rushOn #coach{top:calc(96px + env(safe-area-inset-top))}}
 #pxscene{position:fixed;inset:0;width:100vw;height:100vh;z-index:46;background:#000;display:none;cursor:pointer;object-fit:contain}
 #pxscene.show{display:block;animation:pxIn .25s ease-out}
 #pxscene.out{opacity:0;transition:opacity .25s}
@@ -478,6 +484,24 @@ img.pix,.ava.pix,#pxscene{image-rendering:pixelated;image-rendering:crisp-edges}
 .sbar b{flex:0 0 34px;height:12px;border:2px solid #000;border-radius:2px}
 .selInfo label,.selInfo .lpRow>span{color:#fff}
 .legal h3{margin-top:18px}.legal h4{margin:12px 0 2px;color:var(--ink)}.legal p,.legal li{font-weight:500;font-size:14px}
+
+/* ===== rush shift ===== */
+.rushBot{flex-direction:column;align-items:center;gap:6px}
+.rushBot .res{display:flex;gap:8px;pointer-events:auto}
+.rushBot .res span{background:#fff;border:3px solid var(--ink);border-radius:12px;padding:2px 10px;font-weight:800;box-shadow:0 3px 0 var(--ink)}
+.lineChips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;pointer-events:auto;max-width:96vw}
+.lineChips .hint{background:#fff7d6;border:3px solid var(--ink);border-radius:12px;padding:4px 10px;font-size:13px}
+.lchip{display:flex;align-items:center;gap:3px;background:#fff;border:3px solid var(--ink);border-left:12px solid var(--lc);border-radius:12px;padding:2px 4px;box-shadow:0 3px 0 var(--ink)}
+.lchip span{font-weight:800;font-size:13px;padding:0 4px}
+.lchip button{min-height:30px;min-width:30px;padding:0 6px;border-radius:8px;box-shadow:0 2px 0 var(--ink);font-size:14px}
+.lchip i{display:none}
+.upgr{text-align:center}
+.upgr img{max-width:100%;height:auto}
+.upCards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.upCard{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px;min-height:140px}
+.upCard span{font-size:40px}.upCard b{font-size:17px}.upCard small{font-weight:500;color:var(--muted)}
+.howto{text-align:left;font-weight:500;line-height:1.5;padding-left:20px}.howto li{margin:6px 0}
+@media (max-width:760px){.lchip button{min-width:28px;padding:0 4px}.rushBot .res span{padding:1px 7px;font-size:13px}}
 </style>
 </head><body>
 <script src=dist/littlejs.js></script>
@@ -487,6 +511,7 @@ img.pix,.ava.pix,#pxscene{image-rendering:pixelated;image-rendering:crisp-edges}
 <script src=src/legacy.js></script>
 <script src=src/model.js></script>
 <script src=src/shiftSim.js></script>
+<script src=src/rush.js></script>
 <script src=src/pixel.js></script>
 <script src=src/floor.js></script>
 <script src=src/story.js></script>
@@ -494,6 +519,7 @@ img.pix,.ava.pix,#pxscene{image-rendering:pixelated;image-rendering:crisp-edges}
 <script src=src/pxscenes.js></script>
 <script src=src/ui.js></script>
 <script src=src/uiLegacy.js></script>
+<script src=src/rushview.js></script>
 <script src=src/select.js></script>
 <script src=game.js></script>
 </body>

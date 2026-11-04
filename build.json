@@ -2,5 +2,5 @@
     "title": "Warehouse Manager",
     "name": "warehouseManager",
     "engine": "dist/littlejs.js",
-    "sources": ["templates/gameFx.js", "src/data.js", "src/warehouseMap.js", "src/legacy.js", "src/model.js", "src/shiftSim.js", "src/pixel.js", "src/floor.js", "src/story.js", "src/spectacle.js", "src/pxscenes.js", "src/ui.js", "src/uiLegacy.js", "src/select.js", "game.js"]
+    "sources": ["templates/gameFx.js", "src/data.js", "src/warehouseMap.js", "src/legacy.js", "src/model.js", "src/shiftSim.js", "src/rush.js", "src/pixel.js", "src/floor.js", "src/story.js", "src/spectacle.js", "src/pxscenes.js", "src/ui.js", "src/uiLegacy.js", "src/rushview.js", "src/select.js", "game.js"]
 }

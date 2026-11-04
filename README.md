@@ -1,6 +1,6 @@
 # Warehouse Manager
 
-A deep logistics management sim with a real-time shift you play like Dinner Dash. You run a warehouse against rival companies: Football Manager-style staff, contracts, training, transfers, facilities, finances and board pressure, plus a hands-on shift where you move workers between coloured zones and stop accidents before they happen.
+A deep logistics management sim with a real-time shift that mashes up Mini Metro and Diner Dash. You run a warehouse against rival companies: Football Manager-style staff, contracts, training, transfers, facilities, finances and board pressure, plus a hands-on shift where you draw conveyor networks that get every colour-coded parcel to the right door, while you juggle the crew and stop accidents before they happen.
 
 Bright, chunky, toy-like visuals (Canvas2D in a world transform: rounded outlined shapes, chibi workers with moods, toy forklifts). Built on the [LittleJS](https://github.com/KilledByAPixel/LittleJS) engine (vendored in `dist/`). No build step needed to play.
 
@@ -10,44 +10,39 @@ Open `index.html` in a browser. It also works offline from `file://`. To test on
 
 Single-file build: `npm install && npm run build` → `build/index.html` (one self-contained file) and `warehouseManager.zip`.
 
-## The shift (the "match")
+## The shift: RUSH (Mini Metro × Diner Dash)
 
-8 hours compressed into 8 minutes at 1x (2x and 4x available). Parcels flow **Dock → Inbound → Stow → Pick → Pack → Outbound → Bay**.
+You don't watch the shift, you build it and run it. Eight hours are compressed into eight minutes, at 1x, 2x or 3x speed. Space pauses, and you can redraw at any time while paused.
 
-| Zone | Colour | Notes |
-|---|---|---|
-| Inbound / Receiving | 🔵 Blue | Trucks dock in waves. Watch the queue |
-| Stow / Storage | 🟢 Green | Forklift-certified staff are safer |
-| Pick | 🟡 Yellow | Productivity & accuracy |
-| Pack | 🟠 Orange | Errors here ship to customers unless QA catches them |
-| Outbound / Load | 🔴 Red | Strength & safety, forklift cert |
-| Hazmat | 🟣 Purple | Hazmat parcels detour here. Uncertified = 2.5× risk |
-| Quality / Returns | ⚪ Grey | Catches mis-picks, processes returns |
-| Maintenance | ⚫ Black | Auto-dispatched to breakdowns |
-| Break Room | ☕ | Drag tired staff here to recover energy |
+**The network (Mini Metro).** Drag from station to station to lay **conveyor lines**. Tote runners shuttle along each line and carry parcels toward their goal. Parcels hop between lines wherever two lines share a station.
 
-**The floor map.** The zones are buildings around a one-way forklift loop. Inbound, Stow, Pick and Pack sit north of the main forklift road. Hazmat, Quality, Maintenance and Outbound sit south of it. The Break Room is across a second forklift road. Doors open onto green walkways, corridors run between the buildings, and overhead conveyors carry parcels over the roads.
+- 🔵 **Docks (IN)**: trucks unload parcels here.
+- 🟠 **Pack benches**: every parcel must be packed. Hollow shapes are unpacked and filled shapes are packed.
+- ⚪ **Sorters**: cheap junctions, perfect for linking lines together.
+- 🟣 **Hazmat cage** (opens mid-shift): ☣ parcels must be processed here instead of a normal bench.
+- **Doors**: each door has its own **colour and shape**, and each parcel shows the door it belongs to. ▲ red NORTH, ● blue CITY, ■ green AIR, ★ yellow EXPRESS, ◆ orange COAST. New doors, a new dock and the cage open as the shift goes on.
+- The **forklift road** splits the floor. A line can only cross it on a **bridge**, and bridges are limited.
+- Stations that hold too many parcels grow a **red overflow ring**. If the ring fills, the warehouse **gridlocks** and the shift ends early.
+- Parcels that can't reach their door on your network show a **🚫 badge**. Join your lines to fix it.
+- **Every hour** you choose one of two upgrades:
+  - an extra line
+  - an extra tote runner
+  - 2 bridges
+  - a new pack bench
+  - bigger totes
+  - turbo rollers
+  - an agency temp
 
-- **Forklifts** (4 + one per warehouse tier, plus extras when trucks dock) circulate constantly. They stop to load, queue behind each other, and get faster on *Push*.
-- Staff **walk** between zones and to the break room, and **wait at zebra crossings** until the road is clear. Every worker also takes a staggered **meal break** mid-shift, so the roads are always busy.
-- **Patience** comes from Safety Awareness, Concentration, traits (Steady/Professional are patient; Speed Demon, Accident-Prone and Ambitious are not), line speed and Safety Systems. When it runs out, staff **jaywalk**. Usually the forklift slams on its brakes. If they misjudge the gap, a **forklift collision** warning appears with a very short timer: tap it to emergency-stop the forklift.
-- Moving staff now costs real time (walk plus crossing waits), so plan your rotations.
+**The crew (Diner Dash).**
+- **Drag** people onto pack-bench seats, the hazmat cage and door loading bays. Drag tired people to the break room.
+- Put people on **their own colour** for a **COLOUR MATCH** (+25% speed). Doors are the red Outbound zone, benches orange Pack, and the cage purple Hazmat.
+- **Trucks** wait at each door with a patience timer. **Full trucks** pay out, and half-empty departures cost you. Fast loading chains **COMBOS**.
+- **Tap jammed runners** to clear them, and **tap ⚠️ warnings** before the timer runs out: wobbling stacks over packers, and staff crossing the forklift road on foot.
+- Accidents stay brutal (see *Danger*). Every injury flips the *days without an accident* board back to 00.
 
-**Controls**
-- **Drag** a worker to another zone. Stars show how well they fit it, and you get a warning if they lack a required certification.
-- **Tap a worker** to see their card, send them on a break, or move them back to their best zone.
-- **Tap a ⚠️ warning** before its countdown runs out to prevent the accident. If you ignore it, it may be a near miss, a minor injury, or a serious incident with a fine.
-- **Tap a breakdown** to call a paid contractor when there's no maintenance cover.
-- **Tap a zone** to toggle rush-first or first-in-first-out ordering.
-- **Line speed**: Careful / Normal / Push trades throughput against risk and fatigue.
-- **Overtime** adds up to +2h at 1.5× wages and tires the crew.
-- **🤖 Auto** hands the floor to your assistant manager. **⏩ Finish** simulates the rest of the shift.
-- **Pinch / mouse wheel** zooms the map. Drag empty floor to pan when zoomed.
-- Keyboard: `Space` pauses, `1` `2` `4` set the speed.
+The result feeds the same career layer as before: units shipped vs board target, profit, CSAT, staff ratings, Worker of the Shift, injuries and fines.
 
-Smooth hand-offs build a **Flow multiplier** (up to ×2.0) for faster work and bonus revenue. Bottlenecks break it.
-
-**Simulate** runs the same model with your assistant in charge. If your crew is weak, tired or demoralised, the assistant advises against it: they catch fewer warnings than you and accident rates rise.
+**⏩ Let the assistant run it** simulates the shift instead (`ShiftSim`, the original map-based engine with forklift roads and zebra crossings). If your crew is weak, tired or demoralised, the assistant advises against it: they catch fewer warnings than you, so accident rates rise.
 
 ## Pixel art
 
@@ -121,7 +116,9 @@ Cutscenes with characters and branching choices change the game: cash, morale, b
 | `src/story.js` | Cutscene engine, cast, scenes and choices, SVG chibi portraits |
 | `src/uiLegacy.js` | Academy creator, customiser, career screen, offers, safety board |
 | `src/model.js` | Career rules: staff generation, lineup, contracts, training, transfers, league, board, save/load |
-| `src/shiftSim.js` | `ShiftSim`, the shift engine, shared by live play and full simulation, plus the assistant AI |
+| `src/rush.js` | `RushSim`, the playable RUSH shift: network, routing, crew, trucks, incidents, upgrades |
+| `src/rushview.js` | RUSH rendering, line drawing, crew drag, HUD, upgrade cards and help |
+| `src/shiftSim.js` | `ShiftSim`, the map-based engine used when the assistant simulates a shift |
 | `src/floor.js` | LittleJS rendering of the floor, drag-to-assign input, stat bubbles, particles, ZzFX sounds |
 | `src/ui.js` | HTML management screens, HUD, post-shift report, cinematics |
 | `game.js` | LittleJS entry point |

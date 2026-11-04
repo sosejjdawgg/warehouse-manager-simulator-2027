@@ -152,7 +152,7 @@ function coachTip(key)
     el.className = 'show';
     el.onclick = ()=> el.className = '';
     clearTimeout(el._t);
-    el._t = setTimeout(()=> el.className = '', 7000);
+    el._t = setTimeout(()=> el.className = '', typeof rushView !== 'undefined' && rushView.active ? 5000 : 7000);
     playSfx('perfect', .5, 1.3);
 }
 
